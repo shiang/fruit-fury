@@ -1,5 +1,5 @@
 import { CONFIG } from './config'
-import { createHandSource } from './game/camera'
+import { CameraSource } from './game/camera'
 import { Game } from './game/game'
 
 async function boot() {
@@ -8,12 +8,11 @@ async function boot() {
   canvas.width = CONFIG.canvas.width
   canvas.height = CONFIG.canvas.height
   const ctx = canvas.getContext('2d')!
-  const source = await createHandSource(video, canvas)
-  const game = new Game(ctx, video, source)
+  const camera = new CameraSource(video)
+  const game = new Game(ctx, video, camera, canvas)
   await game.start()
 }
 
 boot().catch((err) => {
   console.error(err)
-  document.body.innerHTML = `<p style="color:#fff;font:20px sans-serif;padding:2rem">Failed to start: ${err}</p>`
 })

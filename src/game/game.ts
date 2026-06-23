@@ -8,6 +8,7 @@ import { integrate } from '../engine/physics'
 import { difficultyAt, makeSpawn } from '../engine/spawner'
 import { GameState } from '../engine/scoring'
 import { render, fruitColor, type Half, type Particle } from './renderer'
+import { MouseSource } from './camera'
 import type { HandSource, HandSample } from './camera'
 
 type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'gameover'
@@ -38,11 +39,13 @@ export class Game {
   private flash = 0
 
   private latestSample: HandSample = { hands: [], t: performance.now() }
+  private mouse: MouseSource | null = null
 
   constructor(
     private ctx: CanvasRenderingContext2D,
     private video: HTMLVideoElement,
-    private source: HandSource,
+    private camera: HandSource,
+    private fallbackEl: HTMLElement,
     private rng: () => number = Math.random,
   ) {
     for (let i = 0; i < CONFIG.hand.maxHands; i++) {
@@ -53,9 +56,28 @@ export class Game {
   }
 
   async start(): Promise<void> {
-    await this.source.start((s) => { this.latestSample = s })
     window.addEventListener('keydown', (e) => this.onKey(e.key))
-    this.loop()
+    this.loop()                 // render immediately — title shows right away
+    this.attachInput()          // do NOT await; never blocks the loop
+  }
+
+  private attachInput(): void {
+    // mouse is the immediate default so there's always input + interactivity
+    this.mouse = new MouseSource(this.fallbackEl)
+    void this.mouse.start((s) => { this.latestSample = s })
+
+    // upgrade to camera in the background when hands actually arrive
+    void this.camera
+      .start((s) => {
+        if (s.hands.length > 0 && this.mouse) {
+          this.mouse.stop()
+          this.mouse = null
+        }
+        this.latestSample = s
+      })
+      .catch((err) => {
+        console.warn('Camera unavailable; using mouse control.', err)
+      })
   }
 
   private onKey(key: string): void {

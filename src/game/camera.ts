@@ -90,21 +90,3 @@ export class MouseSource implements HandSource {
     this.listener = null
   }
 }
-
-/** Try the camera; fall back to mouse on any failure. */
-export async function createHandSource(
-  video: HTMLVideoElement,
-  fallbackEl: HTMLElement,
-): Promise<HandSource> {
-  const cam = new CameraSource(video)
-  try {
-    // Probe permissions/availability early by constructing+starting later;
-    // here we just return camera and let game.ts handle start() errors.
-    void cam
-    await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-      .then((s) => s.getTracks().forEach((t) => t.stop()))
-    return cam
-  } catch {
-    return new MouseSource(fallbackEl)
-  }
-}
