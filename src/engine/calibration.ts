@@ -29,10 +29,22 @@ export function saveReachBox(box: ReachBox): void {
   } catch { /* ignore */ }
 }
 
+/** Type guard: a persisted box is only trusted if all bounds are finite, in [0,1], and ordered. */
+function isValidBox(b: unknown): b is ReachBox {
+  if (typeof b !== 'object' || b === null) return false
+  const r = b as Record<string, unknown>
+  const nums = [r.minX, r.minY, r.maxX, r.maxY]
+  if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1)) return false
+  return (r.minX as number) < (r.maxX as number) && (r.minY as number) < (r.maxY as number)
+}
+
 export function loadReachBox(): ReachBox {
   try {
     const raw = localStorage.getItem(CONFIG.calibration.storageKey)
-    if (raw) return JSON.parse(raw) as ReachBox
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (isValidBox(parsed)) return parsed
+    }
   } catch { /* ignore */ }
   return { ...DEFAULT }
 }

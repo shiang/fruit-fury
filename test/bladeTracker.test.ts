@@ -42,6 +42,12 @@ describe('BladeTracker', () => {
     expect(b.getTrail(300).length).toBe(0)  // both older than 160ms
   })
 
+  it('returns null when two samples share a timestamp (dt === 0)', () => {
+    const b = make()
+    b.push({ x: 0, y: 0 }, 10)
+    expect(b.push({ x: 100, y: 0 }, 10)).toBeNull()
+  })
+
   it('reset clears state so next push emits no segment', () => {
     const b = make()
     b.push({ x: 0, y: 0 }, 0)

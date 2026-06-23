@@ -31,10 +31,14 @@ export class BladeTracker {
     return { from: prev.pos, to: pos }
   }
 
-  /** Trail points still within the fade lifetime, oldest first. */
+  /**
+   * Trail points still within the fade lifetime, oldest first.
+   * Side effect: prunes expired points from internal state. Returns a shallow
+   * copy so callers cannot mutate the tracker's internal array.
+   */
   getTrail(now: number): TrailPoint[] {
     this.trail = this.trail.filter((p) => now - p.t <= this.trailLifetimeMs)
-    return this.trail
+    return this.trail.slice()
   }
 
   reset(): void {
