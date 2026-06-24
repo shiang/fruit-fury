@@ -2,7 +2,7 @@ import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision'
 import type { Vec2 } from '../types'
 import { CONFIG } from '../config'
 
-export interface HandSample { hands: Vec2[]; t: number } // normalized 0..1 fingertips
+export interface HandSample { hands: Vec2[]; handedness: string[]; t: number } // normalized 0..1 fingertips; handedness parallel to hands ('Left'/'Right')
 
 export type HandListener = (sample: HandSample) => void
 
@@ -47,11 +47,17 @@ export class CameraSource implements HandSource {
       const now = performance.now()
       const res = this.landmarker.detectForVideo(this.video, now)
       const tip = CONFIG.hand.fingertipLandmark
-      const hands: Vec2[] = (res.landmarks ?? [])
-        .map((lm) => lm[tip])
-        .filter(Boolean)
-        .map((p) => ({ x: p.x, y: p.y }))
-      onSample({ hands, t: now })
+      const lms = res.landmarks ?? []
+      const hd = (res as any).handednesses ?? (res as any).handedness ?? []
+      const hands: Vec2[] = []
+      const handedness: string[] = []
+      for (let i = 0; i < lms.length; i++) {
+        const p = lms[i][tip]
+        if (!p) continue
+        hands.push({ x: p.x, y: p.y })
+        handedness.push(hd[i]?.[0]?.categoryName ?? hd[i]?.[0]?.displayName ?? 'Right')
+      }
+      onSample({ hands, handedness, t: now })
       this.raf = requestAnimationFrame(tick)
     }
     this.raf = requestAnimationFrame(tick)
@@ -75,7 +81,7 @@ export class MouseSource implements HandSource {
     const x = (e.clientX - r.left) / r.width
     const y = (e.clientY - r.top) / r.height
     // Mirror so it matches the camera pipeline's mirror in mapToGame.
-    this.listener?.({ hands: [{ x: 1 - x, y }], t: performance.now() })
+    this.listener?.({ hands: [{ x: 1 - x, y }], handedness: ['Right'], t: performance.now() })
   }
 
   constructor(private el: HTMLElement) {}

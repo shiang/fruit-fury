@@ -38,8 +38,12 @@ export class Game {
   private shake = 0
   private flash = 0
 
-  private latestSample: HandSample = { hands: [], t: performance.now() }
+  private latestSample: HandSample = { hands: [], handedness: [], t: performance.now() }
+  // The game runs for the page lifetime with no teardown by design: the mouse
+  // source is assigned once and never stopped.
   private mouse: MouseSource | null = null
+  private lastCameraHandT = -Infinity
+  private lastTrails: TrailPoint[][] = []
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -62,18 +66,22 @@ export class Game {
   }
 
   private attachInput(): void {
-    // mouse is the immediate default so there's always input + interactivity
+    // mouse is the immediate default so there's always input + interactivity.
+    // Keep it attached for the page lifetime; arbitrate against the camera by recency.
     this.mouse = new MouseSource(this.fallbackEl)
-    void this.mouse.start((s) => { this.latestSample = s })
+    void this.mouse.start((s) => {
+      if (performance.now() - this.lastCameraHandT < 1000) return
+      this.latestSample = s
+    })
 
-    // upgrade to camera in the background when hands actually arrive
+    // camera drives input only on frames where it actually sees hands; when it
+    // sees none, the mouse takes over again after the 1s window
     void this.camera
       .start((s) => {
-        if (s.hands.length > 0 && this.mouse) {
-          this.mouse.stop()
-          this.mouse = null
+        if (s.hands.length > 0) {
+          this.lastCameraHandT = performance.now()
+          this.latestSample = s
         }
-        this.latestSample = s
       })
       .catch((err) => {
         console.warn('Camera unavailable; using mouse control.', err)
@@ -116,19 +124,20 @@ export class Game {
 
   /** Map current fingertip samples to game space and feed trackers; returns hot segments. */
   private updateBlades(now: number): { trails: TrailPoint[][]; segments: { from: Vec2; to: Vec2 }[] } {
-    const trails: TrailPoint[][] = []
     const segments: { from: Vec2; to: Vec2 }[] = []
     const hands = this.latestSample.hands
-    for (let i = 0; i < this.trackers.length; i++) {
-      const tracker = this.trackers[i]
-      if (i < hands.length) {
-        const p = mapToGame(hands[i], this.box, CONFIG.canvas)
-        const seg = tracker.push(p, now)
-        if (seg) segments.push(seg)
-      }
-      trails.push(tracker.getTrail(now))
+    const labels = this.latestSample.handedness ?? []
+    const used = [false, false]
+    for (let i = 0; i < hands.length && i < this.trackers.length; i++) {
+      let slot = labels[i] === 'Left' ? 0 : 1
+      if (used[slot]) slot = used[0] ? 1 : 0
+      used[slot] = true
+      const p = mapToGame(hands[i], this.box, CONFIG.canvas)
+      const seg = this.trackers[slot].push(p, now)
+      if (seg) segments.push(seg)
     }
-    return { trails, segments }
+    this.lastTrails = this.trackers.map((t) => t.getTrail(now))
+    return { trails: this.lastTrails, segments }
   }
 
   private update(now: number, dt: number): void {
@@ -144,6 +153,7 @@ export class Game {
         saveReachBox(this.box)
         this.screen = 'title'
       }
+      this.lastTrails = []
       return
     }
 
@@ -199,13 +209,16 @@ export class Game {
 
     this.advanceCosmetic(dt)
 
-    if (this.state.isOver) {
-      if (this.state.score > this.highScore) {
-        this.highScore = this.state.score
-        localStorage.setItem(CONFIG.highScoreKey, String(this.highScore))
-      }
-      this.screen = 'gameover'
+    this.endGameIfOver()
+  }
+
+  private endGameIfOver(): void {
+    if (!this.state.isOver) return
+    if (this.state.score > this.highScore) {
+      this.highScore = this.state.score
+      localStorage.setItem(CONFIG.highScoreKey, String(this.highScore))
     }
+    this.screen = 'gameover'
   }
 
   private onSlice(e: Entity, now: number): void {
@@ -223,13 +236,6 @@ export class Game {
     this.state.sliceBomb()
     this.shake = 1
     this.spawnParticles(e.pos, '#333', 26)
-    if (this.state.isOver) {
-      if (this.state.score > this.highScore) {
-        this.highScore = this.state.score
-        localStorage.setItem(CONFIG.highScoreKey, String(this.highScore))
-      }
-      this.screen = 'gameover'
-    }
   }
 
   private spawnHalves(e: Entity): void {
@@ -256,27 +262,25 @@ export class Game {
 
   private advanceCosmetic(dt: number): void {
     const g = CONFIG.physics.gravity
-    this.halves = this.halves
-      .map((h) => ({
-        ...h,
-        vel: { x: h.vel.x, y: h.vel.y + g * dt },
-        pos: { x: h.pos.x + h.vel.x * dt, y: h.pos.y + (h.vel.y + g * dt) * dt },
-        rotation: h.rotation + h.angularVel * dt,
-        life: h.life - dt * 0.7,
-      }))
-      .filter((h) => h.life > 0 && h.pos.y - h.radius < CONFIG.canvas.height + 80)
-    this.particles = this.particles
-      .map((p) => ({
-        ...p,
-        vel: { x: p.vel.x, y: p.vel.y + g * 0.5 * dt },
-        pos: { x: p.pos.x + p.vel.x * dt, y: p.pos.y + p.vel.y * dt },
-        life: p.life - dt,
-      }))
-      .filter((p) => p.life > 0)
+    for (const h of this.halves) {
+      h.vel.y += g * dt
+      h.pos.x += h.vel.x * dt
+      h.pos.y += h.vel.y * dt
+      h.rotation += h.angularVel * dt
+      h.life -= dt * 0.7
+    }
+    this.halves = this.halves.filter((h) => h.life > 0 && h.pos.y - h.radius < CONFIG.canvas.height + 80)
+    for (const p of this.particles) {
+      p.vel.y += g * 0.5 * dt
+      p.pos.x += p.vel.x * dt
+      p.pos.y += p.vel.y * dt
+      p.life -= dt
+    }
+    this.particles = this.particles.filter((p) => p.life > 0)
   }
 
   private draw(now: number): void {
-    const trails = this.trackers.map((t) => t.getTrail(now))
+    const trails = this.lastTrails
     render({
       ctx: this.ctx, video: this.video, showFeed: this.showFeed,
       entities: this.entities, halves: this.halves, particles: this.particles,
