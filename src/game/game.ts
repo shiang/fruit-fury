@@ -1,7 +1,6 @@
 import { CONFIG } from '../config'
-import type { Entity, ReachBox, TrailPoint, Vec2 } from '../types'
+import type { Entity, TrailPoint, Vec2 } from '../types'
 import { mapToGame } from '../engine/mapping'
-import { boxFromSamples, loadReachBox, saveReachBox } from '../engine/calibration'
 import { BladeTracker } from '../engine/bladeTracker'
 import { segmentHitsCircle } from '../engine/collision'
 import { integrate } from '../engine/physics'
@@ -15,7 +14,6 @@ type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'gameover'
 
 export class Game {
   private screen: Screen = 'title'
-  private box: ReachBox = loadReachBox()
   private trackers: BladeTracker[] = []
   private entities: Entity[] = []
   private halves: Half[] = []
@@ -29,7 +27,6 @@ export class Game {
   private spawnTimer = 0
   private nextId = 1
 
-  private calibSamples: Vec2[] = []
   private calibUntil = 0
   private countdownUntil = 0
 
@@ -44,6 +41,8 @@ export class Game {
   private mouse: MouseSource | null = null
   private lastCameraHandT = -Infinity
   private lastTrails: TrailPoint[][] = []
+  private smoothedPos: (Vec2 | null)[] = [null, null]
+  private cursorPos: Vec2[] = []
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -97,7 +96,6 @@ export class Game {
 
   private beginCalibration(): void {
     this.screen = 'calibrate'
-    this.calibSamples = []
     this.calibUntil = performance.now() + CONFIG.calibration.sampleMs
   }
 
@@ -111,6 +109,7 @@ export class Game {
     this.state = new GameState()
     this.elapsed = 0; this.spawnTimer = 0
     this.trackers.forEach((t) => t.reset())
+    this.smoothedPos = [null, null]
   }
 
   private loop = (): void => {
@@ -128,13 +127,26 @@ export class Game {
     const hands = this.latestSample.hands
     const labels = this.latestSample.handedness ?? []
     const used = [false, false]
+    const alpha = CONFIG.slash.smoothing
+    this.cursorPos = []
     for (let i = 0; i < hands.length && i < this.trackers.length; i++) {
       let slot = labels[i] === 'Left' ? 0 : 1
       if (used[slot]) slot = used[0] ? 1 : 0
       used[slot] = true
-      const p = mapToGame(hands[i], this.box, CONFIG.canvas)
+      const raw = mapToGame(hands[i], CONFIG.canvas)
+      // Exponential moving average to suppress hand-tracking jitter
+      const prev = this.smoothedPos[slot]
+      const p = prev
+        ? { x: prev.x + alpha * (raw.x - prev.x), y: prev.y + alpha * (raw.y - prev.y) }
+        : raw
+      this.smoothedPos[slot] = p
+      this.cursorPos.push(p)
       const seg = this.trackers[slot].push(p, now)
       if (seg) segments.push(seg)
+    }
+    // Reset smoothed positions for slots that lost their hand this frame
+    for (let s = 0; s < this.smoothedPos.length; s++) {
+      if (!used[s]) this.smoothedPos[s] = null
     }
     this.lastTrails = this.trackers.map((t) => t.getTrail(now))
     return { trails: this.lastTrails, segments }
@@ -147,13 +159,10 @@ export class Game {
     if (this.comboText && now > this.comboTextUntil) this.comboText = null
 
     if (this.screen === 'calibrate') {
-      for (const h of this.latestSample.hands) this.calibSamples.push(h)
       if (now >= this.calibUntil) {
-        this.box = boxFromSamples(this.calibSamples, CONFIG.calibration.margin)
-        saveReachBox(this.box)
         this.screen = 'title'
       }
-      this.lastTrails = []
+      this.updateBlades(now) // show cursor so user can verify alignment
       return
     }
 
@@ -284,7 +293,7 @@ export class Game {
     render({
       ctx: this.ctx, video: this.video, showFeed: this.showFeed,
       entities: this.entities, halves: this.halves, particles: this.particles,
-      trails, score: this.state.score, lives: this.state.lives, highScore: this.highScore,
+      trails, cursors: this.cursorPos, score: this.state.score, lives: this.state.lives, highScore: this.highScore,
       comboText: this.comboText, shake: this.shake, flash: this.flash, now,
     })
     this.drawOverlay(now)

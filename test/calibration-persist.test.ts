@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { saveReachBox, loadReachBox } from '../src/engine/calibration'
 import type { ReachBox } from '../src/types'
 
-const DEFAULT_BOX: ReachBox = { minX: 0.2, minY: 0.2, maxX: 0.8, maxY: 0.8 }
+const DEFAULT_BOX: ReachBox = { minX: 0, minY: 0, maxX: 1, maxY: 1 }
 
 function installMockStorage(): void {
   const store = new Map<string, string>()

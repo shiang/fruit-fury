@@ -24,6 +24,7 @@ export interface RenderInput {
   halves: Half[]
   particles: Particle[]
   trails: TrailPoint[][]      // one trail per hand
+  cursors: Vec2[]             // mapped hand positions for cursor dots
   score: number
   lives: number
   highScore: number
@@ -65,6 +66,7 @@ export function render(input: RenderInput): void {
   drawHalves(ctx, input.halves)
   drawEntities(ctx, input.entities)
   for (const trail of input.trails) drawBlade(ctx, trail, input.now)
+  drawCursors(ctx, input.cursors)
 
   // combo banner
   if (input.comboText) {
@@ -169,4 +171,16 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
   ctx.font = '32px sans-serif'
   ctx.fillText('❤'.repeat(input.lives) + '·'.repeat(Math.max(0, CONFIG.lives - input.lives)), CONFIG.canvas.width - 24, 44)
   ctx.restore()
+}
+
+function drawCursors(ctx: CanvasRenderingContext2D, cursors: Vec2[]) {
+  for (const c of cursors) {
+    ctx.save()
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'
+    ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(c.x, c.y, 14, 0, Math.PI * 2); ctx.stroke()
+    ctx.restore()
+  }
 }

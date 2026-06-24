@@ -16,6 +16,6 @@ describe('boxFromSamples', () => {
   })
   it('falls back to the default box when there are too few samples', () => {
     const box = boxFromSamples([], 0.04)
-    expect(box).toEqual({ minX: 0.2, minY: 0.2, maxX: 0.8, maxY: 0.8 })
+    expect(box).toEqual({ minX: 0, minY: 0, maxX: 1, maxY: 1 })
   })
 })

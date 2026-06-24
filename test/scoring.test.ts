@@ -4,7 +4,7 @@ import { GameState } from '../src/engine/scoring'
 describe('GameState', () => {
   it('starts with full lives and zero score', () => {
     const g = new GameState()
-    expect(g.lives).toBe(3)
+    expect(g.lives).toBe(5)
     expect(g.score).toBe(0)
     expect(g.isOver).toBe(false)
   })
@@ -36,13 +36,13 @@ describe('GameState', () => {
 
   it('loses a life on a missed fruit and ends at zero', () => {
     const g = new GameState()
-    g.missFruit(); g.missFruit(); expect(g.isOver).toBe(false)
+    g.missFruit(); g.missFruit(); g.missFruit(); g.missFruit(); expect(g.isOver).toBe(false)
     g.missFruit(); expect(g.lives).toBe(0); expect(g.isOver).toBe(true)
   })
 
   it('loses a life when a bomb is sliced', () => {
     const g = new GameState()
     g.sliceBomb()
-    expect(g.lives).toBe(2)
+    expect(g.lives).toBe(4)
   })
 })
