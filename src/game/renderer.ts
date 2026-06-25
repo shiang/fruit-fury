@@ -7,7 +7,8 @@ export interface Half { pos: Vec2; vel: Vec2; rotation: number; angularVel: numb
 
 const FRUIT_COLORS: Record<string, string> = {
   watermelon: '#e0394e', apple: '#c6303a', orange: '#f59226', lime: '#7ac043',
-  strawberry: '#e01e3c', pineapple: '#e8a820', peach: '#ff9e6d', kiwi: '#7ac043', bomb: '#1a1a1a',
+  strawberry: '#e01e3c', pineapple: '#e8a820', peach: '#ff9e6d', kiwi: '#7ac043',
+  bomb: '#1a1a1a', heart: '#ff4d6d', 'golden-heart': '#ffd700',
 }
 
 export function fruitColor(type: string): string {
@@ -18,6 +19,7 @@ export interface RenderInput {
   ctx: CanvasRenderingContext2D
   video: HTMLVideoElement | null
   showFeed: boolean
+  showHud: boolean
   canvas: CanvasSize
   entities: Entity[]
   halves: Half[]
@@ -97,7 +99,7 @@ export function render(input: RenderInput): void {
     ctx.restore()
   }
 
-  drawHud(ctx, input)
+  if (input.showHud) drawHud(ctx, input)
 
   if (input.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${input.flash})`

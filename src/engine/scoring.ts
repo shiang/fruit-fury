@@ -45,6 +45,14 @@ export class GameState {
     this.loseLife()
   }
 
+  /** Heal lives. Returns the actual number restored. */
+  heal(amount: number): number {
+    if (this.isOver) return 0
+    const before = this.lives
+    this.lives = Math.min(this.lives + amount, CONFIG.lives)
+    return this.lives - before
+  }
+
   /** Returns true if the player has sliced enough fruit to advance. */
   checkLevelUp(): boolean {
     if (this.fruitsSlicedThisLevel >= this.levelConfig.fruitsToAdvance) {

@@ -1,4 +1,4 @@
-import type { FruitType, EntityType } from '../types'
+import type { FruitType, EntityType, BonusType } from '../types'
 
 type Ctx = CanvasRenderingContext2D
 
@@ -33,6 +33,45 @@ export function drawBomb(ctx: Ctx, r: number): void {
   ctx.fillRect(-3, -r - 12, 6, 14)
   ctx.fillStyle = '#ff7a45'
   ctx.beginPath(); ctx.arc(0, -r - 14, 5, 0, Math.PI * 2); ctx.fill()
+}
+
+export function drawBonus(ctx: Ctx, type: BonusType, r: number): void {
+  const pulse = 0.9 + 0.1 * Math.sin(performance.now() * 0.005)
+  const pr = r * pulse
+  if (type === 'golden-heart') {
+    // Outer glow
+    const glow = ctx.createRadialGradient(0, 0, pr * 0.5, 0, 0, pr * 1.6)
+    glow.addColorStop(0, 'rgba(255,215,0,0.4)')
+    glow.addColorStop(1, 'rgba(255,215,0,0)')
+    ctx.fillStyle = glow
+    ctx.beginPath(); ctx.arc(0, 0, pr * 1.6, 0, Math.PI * 2); ctx.fill()
+    drawHeartShape(ctx, pr, '#ffd700', '#ffec8b')
+    // Sparkles
+    ctx.fillStyle = '#ffffff'
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + performance.now() * 0.002
+      const sx = Math.cos(a) * pr * 0.5
+      const sy = Math.sin(a) * pr * 0.5
+      ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI * 2); ctx.fill()
+    }
+  } else {
+    drawHeartShape(ctx, pr, '#ff4d6d', '#ff90a0')
+  }
+}
+
+function drawHeartShape(ctx: Ctx, r: number, mainColor: string, highlightColor: string): void {
+  const grad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, 0, 0, 0, r)
+  grad.addColorStop(0, highlightColor)
+  grad.addColorStop(1, mainColor)
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.moveTo(0, r * 0.35)
+  ctx.bezierCurveTo(-r * 0.5, -r * 0.1, -r * 0.8, -r * 0.4, -r * 0.3, -r * 0.55)
+  ctx.bezierCurveTo(-r * 0.1, -r * 0.62, 0, -r * 0.4, 0, -r * 0.25)
+  ctx.bezierCurveTo(0, -r * 0.4, r * 0.1, -r * 0.62, r * 0.3, -r * 0.55)
+  ctx.bezierCurveTo(r * 0.8, -r * 0.4, r * 0.5, -r * 0.1, 0, r * 0.35)
+  ctx.closePath()
+  ctx.fill()
 }
 
 function drawWatermelon(ctx: Ctx, r: number): void {
@@ -208,6 +247,7 @@ function drawKiwi(ctx: Ctx, r: number): void {
 
 export function drawEntity(ctx: Ctx, type: EntityType, radius: number): void {
   if (type === 'bomb') drawBomb(ctx, radius)
+  else if (type === 'heart' || type === 'golden-heart') drawBonus(ctx, type, radius)
   else drawFruit(ctx, type, radius)
 }
 

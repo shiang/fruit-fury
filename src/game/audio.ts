@@ -1,6 +1,6 @@
 import { CONFIG } from '../config'
 
-type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup'
+type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal'
 
 /** Procedural sound effects via Web Audio API — no audio files needed. */
 export class AudioEngine {
@@ -40,6 +40,8 @@ export class AudioEngine {
       case 'combo': this.combo(); break
       case 'miss': this.miss(); break
       case 'levelup': this.levelUp(); break
+      case 'menuclick': this.menuClick(); break
+      case 'heal': this.heal(); break
     }
   }
 
@@ -112,5 +114,14 @@ export class AudioEngine {
   private levelUp(): void {
     const notes = [523, 659, 784, 1047]
     notes.forEach((f, i) => this.tone(f, 0.18, 'square', 0.18, undefined, i * 0.1))
+  }
+
+  private menuClick(): void {
+    this.tone(659, 0.06, 'sine', 0.2, 880)
+  }
+
+  private heal(): void {
+    this.tone(784, 0.12, 'sine', 0.2)
+    this.tone(1047, 0.16, 'sine', 0.18, undefined, 0.08)
   }
 }

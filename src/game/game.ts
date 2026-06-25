@@ -8,10 +8,11 @@ import { makeSpawn } from '../engine/spawner'
 import { GameState } from '../engine/scoring'
 import { render, fruitColor, type Half, type Particle } from './renderer'
 import { AudioEngine } from './audio'
+import { hitTestButtons, pointInButton, drawButton, drawMenuCursor, type MenuButton, type MenuIcon } from './menu'
 import { MouseSource } from './camera'
 import type { HandSource, HandSample } from './camera'
 
-type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'gameover'
+type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'paused' | 'gameover'
 
 export class Game {
   private screen: Screen = 'title'
@@ -38,12 +39,16 @@ export class Game {
   private shake = 0
   private flash = 0
 
-  private latestSample: HandSample = { hands: [], handedness: [], t: performance.now() }
+  private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
   private mouse: MouseSource | null = null
   private lastCameraHandT = -Infinity
   private lastTrails: TrailPoint[][] = []
   private smoothedPos: (Vec2 | null)[] = [null, null]
   private cursorPos: Vec2[] = []
+
+  private menuBtnStates = new Map<string, { hover: number; holdProgress: number }>()
+  private menuButtons: MenuButton[] = []
+  private static readonly MENU_HOLD_S = 0.6
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -60,8 +65,9 @@ export class Game {
   }
 
   async start(): Promise<void> {
-    window.addEventListener('keydown', (e) => this.onKey(e.key))
+    window.addEventListener('keydown', (e) => this.onKey(e))
     window.addEventListener('resize', () => this.resize())
+    this.fallbackEl.addEventListener('click', this.onMenuClick)
     this.resize()
     this.loop()
     this.attachInput()
@@ -94,13 +100,125 @@ export class Game {
       })
   }
 
-  private onKey(key: string): void {
+  private onKey(e: KeyboardEvent): void {
     this.audio.init()
+    const key = e.key
+    if (key === 'Escape') {
+      if (this.screen === 'playing') { this.screen = 'paused'; return }
+      if (this.screen === 'paused') { this.screen = 'playing'; return }
+    }
     if (key === 'f') this.showFeed = !this.showFeed
     if (key === 'm') this.audio.muted = !this.audio.muted
-    if (this.screen === 'title' && key === 'Enter') this.beginCountdown()
-    if (this.screen === 'title' && key === 'c') this.beginCalibration()
-    if (this.screen === 'gameover' && key === 'Enter') { this.resetGame(); this.beginCountdown() }
+    if (this.screen === 'title' && key === 'Enter') this.activateMenuButton('play')
+    if (this.screen === 'title' && key === 'c') this.activateMenuButton('calibrate')
+    if (this.screen === 'gameover' && key === 'Enter') this.activateMenuButton('play')
+    if (this.screen === 'paused' && key === 'Enter') this.activateMenuButton('resume')
+  }
+
+  private onMenuClick = (e: MouseEvent): void => {
+    if (this.screen !== 'title' && this.screen !== 'gameover' && this.screen !== 'paused') return
+    this.audio.init()
+    const r = this.ctx.canvas.getBoundingClientRect()
+    const scaleX = CANVAS_SIZE.width / r.width
+    const scaleY = CANVAS_SIZE.height / r.height
+    const x = (e.clientX - r.left) * scaleX
+    const y = (e.clientY - r.top) * scaleY
+    const buttons = this.buildMenuButtons()
+    for (const btn of buttons) {
+      if (pointInButton(btn, x, y)) {
+        this.activateMenuButton(btn.id)
+        return
+      }
+    }
+  }
+
+  private activateMenuButton(id: string): void {
+    this.audio.init()
+    this.audio.play('menuclick')
+    this.menuBtnStates.clear()
+    switch (id) {
+      case 'play':
+        if (this.screen === 'gameover') this.resetGame()
+        this.beginCountdown()
+        break
+      case 'calibrate':
+        this.beginCalibration()
+        break
+      case 'camera':
+        this.showFeed = !this.showFeed
+        break
+      case 'sound':
+        this.audio.muted = !this.audio.muted
+        break
+      case 'resume':
+        this.screen = 'playing'
+        break
+      case 'quit':
+        this.screen = 'title'
+        this.resetGame()
+        window.close()
+        break
+    }
+  }
+
+  private mkBtn(id: string, label: string, icon: MenuIcon, x: number, y: number, w: number, h: number, small: boolean, toggled: boolean): MenuButton {
+    const state = this.menuBtnStates.get(id)
+    return { id, label, icon, x, y, w, h, hover: state?.hover ?? 0, holdProgress: state?.holdProgress ?? 0, small, toggled }
+  }
+
+  private buildMenuButtons(): MenuButton[] {
+    const { width, height } = CANVAS_SIZE
+    const cx = width / 2
+    const buttons: MenuButton[] = []
+    const bw = Math.min(320, width * 0.38)
+    const bh = Math.min(64, height * 0.085)
+
+    if (this.screen === 'title') {
+      let y = height * 0.52
+      buttons.push(this.mkBtn('play', 'Play', 'play', cx, y, bw, bh, false, true))
+      y += bh + 18
+      buttons.push(this.mkBtn('calibrate', 'Calibrate', 'calibrate', cx, y, bw, bh, false, true))
+      y += bh + 30
+      const tw = Math.min(170, width * 0.2)
+      const th = 44
+      buttons.push(this.mkBtn('camera', `Camera ${this.showFeed ? 'On' : 'Off'}`, this.showFeed ? 'camera' : 'cameraOff', cx - tw / 2 - 10, y, tw, th, true, this.showFeed))
+      buttons.push(this.mkBtn('sound', `Sound ${this.audio.muted ? 'Off' : 'On'}`, this.audio.muted ? 'soundOff' : 'sound', cx + tw / 2 + 10, y, tw, th, true, !this.audio.muted))
+    } else if (this.screen === 'gameover') {
+      const y = height * 0.60
+      buttons.push(this.mkBtn('play', 'Play Again', 'restart', cx, y, bw, bh, false, true))
+    } else if (this.screen === 'paused') {
+      let y = height * 0.42
+      buttons.push(this.mkBtn('resume', 'Resume', 'play', cx, y, bw, bh, false, true))
+      y += bh + 18
+      buttons.push(this.mkBtn('quit', 'Quit', 'quit', cx, y, bw, bh, false, true))
+    }
+    return buttons
+  }
+
+  private updateMenu(dt: number): void {
+    const buttons = this.buildMenuButtons()
+    const cursor = this.cursorPos.length > 0 ? this.cursorPos[0] : null
+    const selectedIdx = cursor ? hitTestButtons(buttons, cursor) : -1
+    const pinching = this.latestSample.pinching?.[0] ?? false
+
+    for (let i = 0; i < buttons.length; i++) {
+      const btn = buttons[i]
+      const isSelected = i === selectedIdx
+      const targetHover = isSelected ? 1 : 0
+      btn.hover += (targetHover - btn.hover) * Math.min(1, dt * 12)
+
+      if (isSelected && pinching) {
+        btn.holdProgress += dt / Game.MENU_HOLD_S
+        if (btn.holdProgress >= 1) {
+          this.activateMenuButton(btn.id)
+          btn.holdProgress = 0
+        }
+      } else {
+        btn.holdProgress = Math.max(0, btn.holdProgress - dt * 3)
+      }
+      this.menuBtnStates.set(btn.id, { hover: btn.hover, holdProgress: btn.holdProgress })
+    }
+    this.menuButtons = buttons
   }
 
   private beginCalibration(): void {
@@ -120,6 +238,7 @@ export class Game {
     this.trackers.forEach((t) => t.reset())
     this.smoothedPos = [null, null]
     this.levelUpText = null
+    this.menuBtnStates.clear()
   }
 
   private loop = (): void => {
@@ -177,7 +296,10 @@ export class Game {
 
     if (this.screen !== 'playing') {
       this.updateBlades(now)
-      this.advanceCosmetic(dt)
+      if (this.screen !== 'paused') this.advanceCosmetic(dt)
+      if (this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused') {
+        this.updateMenu(dt)
+      }
       return
     }
 
@@ -203,7 +325,7 @@ export class Game {
     for (const e of this.entities) {
       const moved = integrate(e, dt, lv.gravity)
       if (moved.pos.y - moved.radius > CANVAS_SIZE.height && moved.vel.y > 0) {
-        if (moved.type !== 'bomb') {
+        if (moved.type !== 'bomb' && moved.type !== 'heart' && moved.type !== 'golden-heart') {
           this.state.missFruit()
           this.audio.play('miss')
         }
@@ -220,6 +342,7 @@ export class Game {
         if (segmentHitsCircle(seg.from, seg.to, e.pos, e.radius)) {
           e.sliced = true
           if (e.type === 'bomb') this.onBomb(e)
+          else if (e.type === 'heart' || e.type === 'golden-heart') this.onBonus(e, now)
           else this.onSlice(e, now)
         }
       }
@@ -269,6 +392,19 @@ export class Game {
     this.audio.play('bomb')
   }
 
+  private onBonus(e: Entity, now: number): void {
+    const isGolden = e.type === 'golden-heart'
+    const healAmount = isGolden ? CONFIG.bonus.goldenHeartHeal : CONFIG.bonus.heartHeal
+    const restored = this.state.heal(healAmount)
+    this.spawnParticles(e.pos, isGolden ? '#ffd700' : '#ff4d6d', 20)
+    this.flash = Math.min(1, this.flash + 0.4)
+    if (restored > 0) {
+      this.comboText = isGolden ? `Full Health!` : `+${restored} Life!`
+      this.comboTextUntil = now + 1000
+    }
+    this.audio.play('heal')
+  }
+
   private spawnHalves(e: Entity): void {
     for (const side of [-1, 1] as const) {
       this.halves.push({
@@ -311,12 +447,14 @@ export class Game {
   }
 
   private draw(now: number): void {
-    const trails = this.lastTrails
     const lv = this.state.levelConfig
+    const isMenu = this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused'
+    const showStandardCursor = !isMenu
     render({
-      ctx: this.ctx, video: this.video, showFeed: this.showFeed, canvas: CANVAS_SIZE,
+      ctx: this.ctx, video: this.video, showFeed: this.showFeed, showHud: this.screen === 'playing' || this.screen === 'countdown', canvas: CANVAS_SIZE,
       entities: this.entities, halves: this.halves, particles: this.particles,
-      trails, cursors: this.cursorPos, score: this.state.score, lives: this.state.lives,
+      trails: isMenu ? [] : this.lastTrails, cursors: showStandardCursor ? this.cursorPos : [],
+      score: this.state.score, lives: this.state.lives,
       maxLives: CONFIG.lives, highScore: this.highScore,
       level: this.state.level, levelName: lv.name,
       fruitsThisLevel: this.state.fruitsSlicedThisLevel, fruitsToAdvance: lv.fruitsToAdvance,
@@ -329,25 +467,144 @@ export class Game {
   private drawOverlay(now: number): void {
     const ctx = this.ctx
     const { width, height } = CANVAS_SIZE
-    const center = (lines: string[]) => {
-      ctx.save()
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, width, height)
-      ctx.textAlign = 'center'; ctx.fillStyle = '#fff8e7'
-      ctx.font = 'bold 56px sans-serif'; ctx.fillText(lines[0], width / 2, height / 2 - 40)
-      ctx.font = '26px sans-serif'
-      lines.slice(1).forEach((l, i) => ctx.fillText(l, width / 2, height / 2 + 20 + i * 38))
-      ctx.restore()
-    }
+    const cx = width / 2
+
     if (this.screen === 'title') {
-      center(['Fruit Fury', 'Enter — Play   |   C — Calibrate', `F — toggle camera (${this.showFeed ? 'on' : 'off'})   |   M — mute (${this.audio.muted ? 'on' : 'off'})`, `Best ${this.highScore}`])
+      this.drawTitleScreen(ctx, cx, width, height, now)
+    } else if (this.screen === 'gameover') {
+      this.drawGameOverScreen(ctx, cx, width, height, now)
+    } else if (this.screen === 'paused') {
+      this.drawPauseScreen(ctx, cx, width, height, now)
     } else if (this.screen === 'calibrate') {
       const left = Math.max(0, Math.ceil((this.calibUntil - now) / 1000))
-      center(['Calibrate', 'Wave both hands around the area you can comfortably reach', `${left}...`])
+      this.drawSimpleOverlay(ctx, width, height, ['Calibrate', 'Wave both hands around the area you can comfortably reach', `${left}...`])
     } else if (this.screen === 'countdown') {
       const left = Math.max(1, Math.ceil((this.countdownUntil - now) / 1000))
-      center([`${left}`])
-    } else if (this.screen === 'gameover') {
-      center(['Game Over', `Score ${this.state.score}   |   Best ${this.highScore}`, `Reached Level ${this.state.level}`, 'Enter — Play again'])
+      this.drawSimpleOverlay(ctx, width, height, [`${left}`])
     }
+
+    // Menu cursor with hold progress
+    if ((this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused') && this.cursorPos.length > 0) {
+      const cursor = this.cursorPos[0]
+      const pinching = this.latestSample.pinching?.[0] ?? false
+      const hoveredBtn = this.menuButtons.length > 0
+        ? this.menuButtons.find((b, _i) => pointInButton(b, cursor.x, cursor.y))
+        : undefined
+      drawMenuCursor(ctx, cursor, pinching, hoveredBtn?.holdProgress ?? 0)
+    }
+  }
+
+  private drawTitleScreen(ctx: CanvasRenderingContext2D, cx: number, width: number, height: number, now: number): void {
+    // Dark backdrop
+    ctx.save()
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(0, 0, width, height)
+
+    // Title with gradient + glow
+    const titleSize = Math.round(height * 0.09)
+    const titleY = height * 0.28
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.shadowColor = 'rgba(255,180,60,0.5)'
+    ctx.shadowBlur = 30
+    ctx.font = `bold ${titleSize}px sans-serif`
+    const grad = ctx.createLinearGradient(0, titleY - titleSize / 2, 0, titleY + titleSize / 2)
+    grad.addColorStop(0, '#ffd35e')
+    grad.addColorStop(0.5, '#ff9e6d')
+    grad.addColorStop(1, '#e0394e')
+    ctx.fillStyle = grad
+    ctx.fillText('FRUIT FURY', cx, titleY)
+
+    // Best score
+    ctx.shadowBlur = 0
+    ctx.font = `${Math.round(height * 0.028)}px sans-serif`
+    ctx.fillStyle = 'rgba(255,248,231,0.7)'
+    ctx.fillText(`Best  ${this.highScore}`, cx, titleY + titleSize * 0.8)
+
+    // Buttons
+    for (const btn of this.menuButtons) drawButton(ctx, btn, now)
+
+    // Hint
+    const usingCamera = performance.now() - this.lastCameraHandT < 2000
+    ctx.font = `${Math.round(height * 0.02)}px sans-serif`
+    ctx.fillStyle = 'rgba(255,248,231,0.45)'
+    ctx.fillText(usingCamera ? 'Hover + pinch to select  |  keys: Enter / C / F / M' : 'Click to select  |  keys: Enter / C / F / M', cx, height * 0.93)
+
+    ctx.restore()
+  }
+
+  private drawGameOverScreen(ctx: CanvasRenderingContext2D, cx: number, width: number, height: number, now: number): void {
+    ctx.save()
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, 0, width, height)
+
+    // Title
+    const titleSize = Math.round(height * 0.08)
+    const titleY = height * 0.25
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.shadowColor = 'rgba(200,30,40,0.5)'
+    ctx.shadowBlur = 25
+    ctx.font = `bold ${titleSize}px sans-serif`
+    ctx.fillStyle = '#e0394e'
+    ctx.fillText('GAME OVER', cx, titleY)
+
+    // Stats panel
+    ctx.shadowBlur = 0
+    const statY = titleY + titleSize * 0.9
+    ctx.font = `bold ${Math.round(height * 0.035)}px sans-serif`
+    ctx.fillStyle = '#fff8e7'
+    ctx.fillText(`Score  ${this.state.score}`, cx, statY)
+    ctx.font = `${Math.round(height * 0.025)}px sans-serif`
+    ctx.fillStyle = 'rgba(255,248,231,0.7)'
+    ctx.fillText(`Best  ${this.highScore}     Level  ${this.state.level}`, cx, statY + height * 0.045)
+
+    // Buttons
+    for (const btn of this.menuButtons) drawButton(ctx, btn, now)
+
+    // Hint
+    const usingCamera = performance.now() - this.lastCameraHandT < 2000
+    ctx.font = `${Math.round(height * 0.02)}px sans-serif`
+    ctx.fillStyle = 'rgba(255,248,231,0.45)'
+    ctx.fillText(usingCamera ? 'Hover + pinch to select  |  Enter to play again' : 'Click to play again  |  Enter', cx, height * 0.93)
+
+    ctx.restore()
+  }
+
+  private drawPauseScreen(ctx: CanvasRenderingContext2D, cx: number, width: number, height: number, now: number): void {
+    ctx.save()
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, 0, width, height)
+
+    const titleSize = Math.round(height * 0.08)
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.shadowColor = 'rgba(255,211,94,0.5)'
+    ctx.shadowBlur = 25
+    ctx.font = `bold ${titleSize}px sans-serif`
+    ctx.fillStyle = '#ffd35e'
+    ctx.fillText('PAUSED', cx, height * 0.25)
+
+    // Buttons
+    ctx.shadowBlur = 0
+    for (const btn of this.menuButtons) drawButton(ctx, btn, now)
+
+    // Hint
+    const usingCamera = performance.now() - this.lastCameraHandT < 2000
+    ctx.font = `${Math.round(height * 0.02)}px sans-serif`
+    ctx.fillStyle = 'rgba(255,248,231,0.45)'
+    ctx.fillText(usingCamera ? 'Hover + pinch to select  |  ESC to resume' : 'Click to select  |  ESC to resume', cx, height * 0.93)
+
+    ctx.restore()
+  }
+
+  private drawSimpleOverlay(ctx: CanvasRenderingContext2D, width: number, height: number, lines: string[]): void {
+    ctx.save()
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, width, height)
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff8e7'
+    ctx.font = `bold ${Math.round(height * 0.075)}px sans-serif`; ctx.fillText(lines[0], width / 2, height / 2 - 40)
+    ctx.font = `${Math.round(height * 0.032)}px sans-serif`
+    lines.slice(1).forEach((l, i) => ctx.fillText(l, width / 2, height / 2 + 20 + i * 38))
+    ctx.restore()
   }
 }

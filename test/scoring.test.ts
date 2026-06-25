@@ -63,4 +63,23 @@ describe('GameState', () => {
     expect(g.checkLevelUp()).toBe(false)
     expect(g.level).toBe(1)
   })
+
+  it('heal restores lives up to max', () => {
+    const g = new GameState()
+    g.sliceBomb()
+    g.sliceBomb()
+    expect(g.lives).toBe(3)
+    g.heal(1)
+    expect(g.lives).toBe(4)
+    g.heal(10)
+    expect(g.lives).toBe(5)
+  })
+
+  it('heal returns actual lives restored', () => {
+    const g = new GameState()
+    g.sliceBomb()
+    expect(g.lives).toBe(4)
+    expect(g.heal(1)).toBe(1)
+    expect(g.heal(10)).toBe(0)
+  })
 })

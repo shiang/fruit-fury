@@ -5,19 +5,45 @@ const FRUITS: FruitType[] = ['watermelon', 'apple', 'orange', 'lime', 'strawberr
 
 /**
  * Build one spawn event from a LevelConfig. `rng` is an injected 0..1 source.
- * rng call order: bomb-roll, x-position, fruit-pick, vx-spread, speed-spread.
+ * rng call order: type-roll, x-position, fruit-pick, vx-spread, peak-spread.
+ * Launch speed is computed so the fruit peaks at canvas.height * peakRatio,
+ * making bounce height scale correctly with any browser window size.
  */
 export function makeSpawn(rng: () => number, canvas: CanvasSize, level: LevelConfig): SpawnEvent {
-  const isBomb = rng() < level.bombChance
+  const roll = rng()
+  const goldenThreshold = level.bombChance + CONFIG.bonus.goldenHeartChance
+  const heartThreshold = goldenThreshold + CONFIG.bonus.heartChance
+
+  let type: SpawnEvent['type']
+  let radius: number
+
+  if (roll < level.bombChance) {
+    type = 'bomb'
+    radius = level.bombRadius
+  } else if (roll < goldenThreshold) {
+    type = 'golden-heart'
+    radius = level.fruitRadius
+  } else if (roll < heartThreshold) {
+    type = 'heart'
+    radius = level.fruitRadius
+  } else {
+    type = FRUITS[Math.floor(rng() * FRUITS.length) % FRUITS.length]
+    radius = level.fruitRadius
+  }
+
   const x = 0.15 * canvas.width + rng() * 0.7 * canvas.width
-  const fruit = FRUITS[Math.floor(rng() * FRUITS.length) % FRUITS.length]
   const vx = (rng() - 0.5) * level.horizontalDrift
-  const speed = level.launchSpeedMin + rng() * (level.launchSpeedMax - level.launchSpeedMin)
+  const peakRatio = level.peakHeightMin + rng() * (level.peakHeightMax - level.peakHeightMin)
+
+  const launchY = canvas.height + 60
+  const peakY = canvas.height * peakRatio
+  const riseHeight = launchY - peakY
+  const speed = Math.sqrt(2 * level.gravity * riseHeight)
 
   return {
-    type: isBomb ? 'bomb' : fruit,
-    pos: { x, y: canvas.height + 60 },
+    type,
+    pos: { x, y: launchY },
     vel: { x: vx, y: -speed },
-    radius: isBomb ? CONFIG.spawn.radius.bomb : CONFIG.spawn.radius.fruit,
+    radius,
   }
 }

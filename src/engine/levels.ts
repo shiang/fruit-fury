@@ -1,14 +1,17 @@
 import type { LevelConfig } from '../types'
 
+// Easy start: big fruits, FEW of them, bounce near the top of the window.
+// Hard end: small fruits, MORE of them, bounce lower (but still above half window),
+// faster horizontal movement, more bombs.
 const LEVELS: LevelConfig[] = [
-  { level: 1,  name: 'Apple Orchard',     fruitsToAdvance: 8,  spawnIntervalMs: 1200, bombChance: 0.05, launchSpeedMin: 1050, launchSpeedMax: 1250, gravity: 1100, burstCount: 1, horizontalDrift: 250 },
-  { level: 2,  name: 'Citrus Grove',      fruitsToAdvance: 12, spawnIntervalMs: 1050, bombChance: 0.08, launchSpeedMin: 1080, launchSpeedMax: 1300, gravity: 1100, burstCount: 1, horizontalDrift: 280 },
-  { level: 3,  name: 'Berry Patch',       fruitsToAdvance: 16, spawnIntervalMs: 950,  bombChance: 0.10, launchSpeedMin: 1100, launchSpeedMax: 1350, gravity: 1150, burstCount: 1, horizontalDrift: 300 },
-  { level: 4,  name: 'Tropical Paradise', fruitsToAdvance: 20, spawnIntervalMs: 850,  bombChance: 0.12, launchSpeedMin: 1150, launchSpeedMax: 1380, gravity: 1150, burstCount: 2, horizontalDrift: 320 },
-  { level: 5,  name: 'Fruit Storm',       fruitsToAdvance: 25, spawnIntervalMs: 750,  bombChance: 0.14, launchSpeedMin: 1180, launchSpeedMax: 1420, gravity: 1200, burstCount: 2, horizontalDrift: 350 },
-  { level: 6,  name: 'Orchard Blitz',     fruitsToAdvance: 30, spawnIntervalMs: 680,  bombChance: 0.16, launchSpeedMin: 1200, launchSpeedMax: 1450, gravity: 1200, burstCount: 2, horizontalDrift: 380 },
-  { level: 7,  name: 'Bomb Garden',       fruitsToAdvance: 35, spawnIntervalMs: 600,  bombChance: 0.18, launchSpeedMin: 1220, launchSpeedMax: 1480, gravity: 1250, burstCount: 3, horizontalDrift: 400 },
-  { level: 8,  name: 'Fruit Fury',        fruitsToAdvance: 40, spawnIntervalMs: 520,  bombChance: 0.20, launchSpeedMin: 1250, launchSpeedMax: 1520, gravity: 1250, burstCount: 3, horizontalDrift: 420 },
+  { level: 1,  name: 'Apple Orchard',     fruitsToAdvance: 8,  spawnIntervalMs: 1400, bombChance: 0.03, peakHeightMin: 0.10, peakHeightMax: 0.16, gravity: 1000, burstCount: 1, horizontalDrift: 120, fruitRadius: 66, bombRadius: 46 },
+  { level: 2,  name: 'Citrus Grove',      fruitsToAdvance: 10, spawnIntervalMs: 1300, bombChance: 0.05, peakHeightMin: 0.13, peakHeightMax: 0.20, gravity: 1000, burstCount: 1, horizontalDrift: 160, fruitRadius: 62, bombRadius: 44 },
+  { level: 3,  name: 'Berry Patch',       fruitsToAdvance: 14, spawnIntervalMs: 1200, bombChance: 0.07, peakHeightMin: 0.16, peakHeightMax: 0.24, gravity: 1050, burstCount: 2, horizontalDrift: 200, fruitRadius: 58, bombRadius: 42 },
+  { level: 4,  name: 'Tropical Paradise', fruitsToAdvance: 18, spawnIntervalMs: 1100, bombChance: 0.09, peakHeightMin: 0.20, peakHeightMax: 0.28, gravity: 1050, burstCount: 2, horizontalDrift: 240, fruitRadius: 54, bombRadius: 42 },
+  { level: 5,  name: 'Fruit Storm',       fruitsToAdvance: 22, spawnIntervalMs: 1000, bombChance: 0.12, peakHeightMin: 0.24, peakHeightMax: 0.32, gravity: 1100, burstCount: 2, horizontalDrift: 280, fruitRadius: 50, bombRadius: 40 },
+  { level: 6,  name: 'Orchard Blitz',     fruitsToAdvance: 28, spawnIntervalMs: 900,  bombChance: 0.15, peakHeightMin: 0.28, peakHeightMax: 0.36, gravity: 1100, burstCount: 3, horizontalDrift: 320, fruitRadius: 46, bombRadius: 40 },
+  { level: 7,  name: 'Bomb Garden',       fruitsToAdvance: 34, spawnIntervalMs: 800,  bombChance: 0.18, peakHeightMin: 0.32, peakHeightMax: 0.40, gravity: 1150, burstCount: 3, horizontalDrift: 360, fruitRadius: 42, bombRadius: 38 },
+  { level: 8,  name: 'Fruit Fury',        fruitsToAdvance: 40, spawnIntervalMs: 700,  bombChance: 0.22, peakHeightMin: 0.36, peakHeightMax: 0.46, gravity: 1200, burstCount: 3, horizontalDrift: 400, fruitRadius: 38, bombRadius: 36 },
 ]
 
 const PREDEFINED_COUNT = LEVELS.length
@@ -23,12 +26,14 @@ export function getLevelConfig(level: number): LevelConfig {
     level,
     name: `Level ${level}`,
     fruitsToAdvance: base.fruitsToAdvance + excess * 5,
-    spawnIntervalMs: Math.max(380, base.spawnIntervalMs - excess * 40),
+    spawnIntervalMs: Math.max(550, base.spawnIntervalMs - excess * 30),
     bombChance: Math.min(0.35, base.bombChance + excess * 0.02),
-    launchSpeedMin: base.launchSpeedMin + excess * 20,
-    launchSpeedMax: base.launchSpeedMax + excess * 25,
+    peakHeightMin: Math.min(0.48, base.peakHeightMin + excess * 0.015),
+    peakHeightMax: Math.min(0.50, base.peakHeightMax + excess * 0.01),
     gravity: base.gravity + excess * 25,
-    burstCount: Math.min(4, base.burstCount + Math.floor(excess / 3)),
-    horizontalDrift: Math.min(550, base.horizontalDrift + excess * 20),
+    burstCount: Math.min(4, base.burstCount + Math.floor(excess / 4)),
+    horizontalDrift: Math.min(600, base.horizontalDrift + excess * 20),
+    fruitRadius: Math.max(28, base.fruitRadius - excess * 2),
+    bombRadius: Math.max(32, base.bombRadius - excess * 1),
   }
 }

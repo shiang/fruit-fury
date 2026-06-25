@@ -13,11 +13,9 @@ export const CONFIG = {
     storageKey: 'fruitFury.reachBox',
   },
   combo: { windowMs: 220, minForBonus: 3, bonusPerExtra: 50 },
-  spawn: {
-    radius: { fruit: 46, bomb: 40 },
-  },
   lives: 5,
   points: { fruit: 10 },
+  bonus: { heartHeal: 1, goldenHeartHeal: 5, heartChance: 0.025, goldenHeartChance: 0.008 },
   particles: { maxCount: 400, perCut: 14 },
   audio: { masterVolume: 0.35 },
   highScoreKey: 'fruitFury.highScore',
