@@ -4,7 +4,7 @@ export interface ReachBox { minX: number; minY: number; maxX: number; maxY: numb
 
 export interface CanvasSize { width: number; height: number }
 
-export type FruitType = 'watermelon' | 'apple' | 'orange' | 'lime'
+export type FruitType = 'watermelon' | 'apple' | 'orange' | 'lime' | 'strawberry' | 'pineapple' | 'peach' | 'kiwi'
 export type EntityType = FruitType | 'bomb'
 
 export interface Entity {
@@ -27,4 +27,17 @@ export interface SpawnEvent {
   pos: Vec2
   vel: Vec2
   radius: number
+}
+
+export interface LevelConfig {
+  level: number
+  name: string
+  fruitsToAdvance: number
+  spawnIntervalMs: number
+  bombChance: number
+  launchSpeedMin: number
+  launchSpeedMax: number
+  gravity: number
+  burstCount: number
+  horizontalDrift: number
 }

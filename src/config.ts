@@ -1,5 +1,9 @@
+import type { CanvasSize } from './types'
+
+/** Mutable canvas dimensions — updated on init and window resize. */
+export const CANVAS_SIZE: CanvasSize = { width: 1280, height: 720 }
+
 export const CONFIG = {
-  canvas: { width: 1280, height: 720 },
   hand: { fingertipLandmark: 8, maxHands: 2 },
   slash: { velocityThreshold: 700, trailLifetimeMs: 160, minSegmentPx: 4, smoothing: 0.4 },
   calibration: {
@@ -10,17 +14,11 @@ export const CONFIG = {
   },
   combo: { windowMs: 220, minForBonus: 3, bonusPerExtra: 50 },
   spawn: {
-    baseIntervalMs: 1100,
-    minIntervalMs: 450,
-    rampMs: 60000,
-    baseBombChance: 0.07,
-    maxBombChance: 0.2,
-    launchSpeed: { min: 1050, max: 1300 },
     radius: { fruit: 46, bomb: 40 },
   },
-  physics: { gravity: 1100 },
   lives: 5,
   points: { fruit: 10 },
   particles: { maxCount: 400, perCut: 14 },
+  audio: { masterVolume: 0.35 },
   highScoreKey: 'fruitFury.highScore',
 } as const

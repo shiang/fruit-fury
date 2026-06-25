@@ -1,12 +1,13 @@
-import { CONFIG } from '../config'
+import { CONFIG, CANVAS_SIZE } from '../config'
 import type { Entity, TrailPoint, Vec2 } from '../types'
 import { mapToGame } from '../engine/mapping'
 import { BladeTracker } from '../engine/bladeTracker'
 import { segmentHitsCircle } from '../engine/collision'
 import { integrate } from '../engine/physics'
-import { difficultyAt, makeSpawn } from '../engine/spawner'
+import { makeSpawn } from '../engine/spawner'
 import { GameState } from '../engine/scoring'
 import { render, fruitColor, type Half, type Particle } from './renderer'
+import { AudioEngine } from './audio'
 import { MouseSource } from './camera'
 import type { HandSource, HandSample } from './camera'
 
@@ -21,9 +22,9 @@ export class Game {
   private state = new GameState()
   private highScore = Number(localStorage.getItem(CONFIG.highScoreKey) ?? 0)
   private showFeed = true
+  private audio = new AudioEngine()
 
   private lastFrame = performance.now()
-  private elapsed = 0
   private spawnTimer = 0
   private nextId = 1
 
@@ -32,12 +33,12 @@ export class Game {
 
   private comboText: string | null = null
   private comboTextUntil = 0
+  private levelUpText: string | null = null
+  private levelUpTextUntil = 0
   private shake = 0
   private flash = 0
 
   private latestSample: HandSample = { hands: [], handedness: [], t: performance.now() }
-  // The game runs for the page lifetime with no teardown by design: the mouse
-  // source is assigned once and never stopped.
   private mouse: MouseSource | null = null
   private lastCameraHandT = -Infinity
   private lastTrails: TrailPoint[][] = []
@@ -60,21 +61,27 @@ export class Game {
 
   async start(): Promise<void> {
     window.addEventListener('keydown', (e) => this.onKey(e.key))
-    this.loop()                 // render immediately — title shows right away
-    this.attachInput()          // do NOT await; never blocks the loop
+    window.addEventListener('resize', () => this.resize())
+    this.resize()
+    this.loop()
+    this.attachInput()
+  }
+
+  private resize(): void {
+    const canvas = this.ctx.canvas
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+    CANVAS_SIZE.width = canvas.width
+    CANVAS_SIZE.height = canvas.height
   }
 
   private attachInput(): void {
-    // mouse is the immediate default so there's always input + interactivity.
-    // Keep it attached for the page lifetime; arbitrate against the camera by recency.
     this.mouse = new MouseSource(this.fallbackEl)
     void this.mouse.start((s) => {
       if (performance.now() - this.lastCameraHandT < 1000) return
       this.latestSample = s
     })
 
-    // camera drives input only on frames where it actually sees hands; when it
-    // sees none, the mouse takes over again after the 1s window
     void this.camera
       .start((s) => {
         if (s.hands.length > 0) {
@@ -88,7 +95,9 @@ export class Game {
   }
 
   private onKey(key: string): void {
+    this.audio.init()
     if (key === 'f') this.showFeed = !this.showFeed
+    if (key === 'm') this.audio.muted = !this.audio.muted
     if (this.screen === 'title' && key === 'Enter') this.beginCountdown()
     if (this.screen === 'title' && key === 'c') this.beginCalibration()
     if (this.screen === 'gameover' && key === 'Enter') { this.resetGame(); this.beginCountdown() }
@@ -107,9 +116,10 @@ export class Game {
   private resetGame(): void {
     this.entities = []; this.halves = []; this.particles = []
     this.state = new GameState()
-    this.elapsed = 0; this.spawnTimer = 0
+    this.spawnTimer = 0
     this.trackers.forEach((t) => t.reset())
     this.smoothedPos = [null, null]
+    this.levelUpText = null
   }
 
   private loop = (): void => {
@@ -121,7 +131,6 @@ export class Game {
     requestAnimationFrame(this.loop)
   }
 
-  /** Map current fingertip samples to game space and feed trackers; returns hot segments. */
   private updateBlades(now: number): { trails: TrailPoint[][]; segments: { from: Vec2; to: Vec2 }[] } {
     const segments: { from: Vec2; to: Vec2 }[] = []
     const hands = this.latestSample.hands
@@ -133,8 +142,7 @@ export class Game {
       let slot = labels[i] === 'Left' ? 0 : 1
       if (used[slot]) slot = used[0] ? 1 : 0
       used[slot] = true
-      const raw = mapToGame(hands[i], CONFIG.canvas)
-      // Exponential moving average to suppress hand-tracking jitter
+      const raw = mapToGame(hands[i], CANVAS_SIZE)
       const prev = this.smoothedPos[slot]
       const p = prev
         ? { x: prev.x + alpha * (raw.x - prev.x), y: prev.y + alpha * (raw.y - prev.y) }
@@ -144,7 +152,6 @@ export class Game {
       const seg = this.trackers[slot].push(p, now)
       if (seg) segments.push(seg)
     }
-    // Reset smoothed positions for slots that lost their hand this frame
     for (let s = 0; s < this.smoothedPos.length; s++) {
       if (!used[s]) this.smoothedPos[s] = null
     }
@@ -153,16 +160,14 @@ export class Game {
   }
 
   private update(now: number, dt: number): void {
-    // decay effects
     this.shake = Math.max(0, this.shake - dt * 3)
     this.flash = Math.max(0, this.flash - dt * 4)
     if (this.comboText && now > this.comboTextUntil) this.comboText = null
+    if (this.levelUpText && now > this.levelUpTextUntil) this.levelUpText = null
 
     if (this.screen === 'calibrate') {
-      if (now >= this.calibUntil) {
-        this.screen = 'title'
-      }
-      this.updateBlades(now) // show cursor so user can verify alignment
+      if (now >= this.calibUntil) this.screen = 'title'
+      this.updateBlades(now)
       return
     }
 
@@ -171,32 +176,37 @@ export class Game {
     }
 
     if (this.screen !== 'playing') {
-      this.updateBlades(now) // keep trails alive visually
+      this.updateBlades(now)
       this.advanceCosmetic(dt)
       return
     }
 
     // PLAYING
-    this.elapsed += dt * 1000
     const { segments } = this.updateBlades(now)
+    const lv = this.state.levelConfig
 
     // spawn
     this.spawnTimer -= dt * 1000
     if (this.spawnTimer <= 0) {
-      const ev = makeSpawn(this.rng, CONFIG.canvas, this.elapsed)
-      this.entities.push({
-        id: this.nextId++, type: ev.type, pos: ev.pos, vel: ev.vel,
-        radius: ev.radius, rotation: 0, angularVel: (this.rng() - 0.5) * 6, sliced: false,
-      })
-      this.spawnTimer = difficultyAt(this.elapsed).spawnIntervalMs
+      for (let b = 0; b < lv.burstCount; b++) {
+        const ev = makeSpawn(this.rng, CANVAS_SIZE, lv)
+        this.entities.push({
+          id: this.nextId++, type: ev.type, pos: ev.pos, vel: ev.vel,
+          radius: ev.radius, rotation: 0, angularVel: (this.rng() - 0.5) * 6, sliced: false,
+        })
+      }
+      this.spawnTimer = lv.spawnIntervalMs
     }
 
     // integrate + cull misses
     const survivors: Entity[] = []
     for (const e of this.entities) {
-      const moved = integrate(e, dt, CONFIG.physics.gravity)
-      if (moved.pos.y - moved.radius > CONFIG.canvas.height && moved.vel.y > 0) {
-        if (moved.type !== 'bomb') this.state.missFruit()  // dropped fruit costs a life
+      const moved = integrate(e, dt, lv.gravity)
+      if (moved.pos.y - moved.radius > CANVAS_SIZE.height && moved.vel.y > 0) {
+        if (moved.type !== 'bomb') {
+          this.state.missFruit()
+          this.audio.play('miss')
+        }
         continue
       }
       survivors.push(moved)
@@ -217,8 +227,17 @@ export class Game {
     this.entities = this.entities.filter((e) => !e.sliced)
 
     this.advanceCosmetic(dt)
-
+    this.checkLevelUp(now)
     this.endGameIfOver()
+  }
+
+  private checkLevelUp(now: number): void {
+    if (this.state.checkLevelUp()) {
+      this.levelUpText = `Level ${this.state.level}!`
+      this.levelUpTextUntil = now + 2000
+      this.flash = Math.min(1, this.flash + 0.6)
+      this.audio.play('levelup')
+    }
   }
 
   private endGameIfOver(): void {
@@ -234,10 +253,12 @@ export class Game {
     this.state.sliceFruit(now)
     this.spawnHalves(e)
     this.spawnParticles(e.pos, fruitColor(e.type))
+    this.audio.play('slice')
     if (this.state.lastCombo >= CONFIG.combo.minForBonus) {
       this.comboText = `Combo x${this.state.lastCombo}!`
       this.comboTextUntil = now + 900
       this.flash = Math.min(1, this.flash + 0.5)
+      this.audio.play('combo')
     }
   }
 
@@ -245,14 +266,15 @@ export class Game {
     this.state.sliceBomb()
     this.shake = 1
     this.spawnParticles(e.pos, '#333', 26)
+    this.audio.play('bomb')
   }
 
   private spawnHalves(e: Entity): void {
-    const color = fruitColor(e.type)
     for (const side of [-1, 1] as const) {
       this.halves.push({
         pos: { ...e.pos }, vel: { x: e.vel.x + side * 120, y: e.vel.y * 0.5 },
-        rotation: e.rotation, angularVel: side * 4, color, side, radius: e.radius, life: 1,
+        rotation: e.rotation, angularVel: side * 4, color: fruitColor(e.type),
+        type: e.type, side, radius: e.radius, life: 1,
       })
     }
   }
@@ -270,7 +292,7 @@ export class Game {
   }
 
   private advanceCosmetic(dt: number): void {
-    const g = CONFIG.physics.gravity
+    const g = this.state.levelConfig.gravity
     for (const h of this.halves) {
       h.vel.y += g * dt
       h.pos.x += h.vel.x * dt
@@ -278,7 +300,7 @@ export class Game {
       h.rotation += h.angularVel * dt
       h.life -= dt * 0.7
     }
-    this.halves = this.halves.filter((h) => h.life > 0 && h.pos.y - h.radius < CONFIG.canvas.height + 80)
+    this.halves = this.halves.filter((h) => h.life > 0 && h.pos.y - h.radius < CANVAS_SIZE.height + 80)
     for (const p of this.particles) {
       p.vel.y += g * 0.5 * dt
       p.pos.x += p.vel.x * dt
@@ -290,18 +312,23 @@ export class Game {
 
   private draw(now: number): void {
     const trails = this.lastTrails
+    const lv = this.state.levelConfig
     render({
-      ctx: this.ctx, video: this.video, showFeed: this.showFeed,
+      ctx: this.ctx, video: this.video, showFeed: this.showFeed, canvas: CANVAS_SIZE,
       entities: this.entities, halves: this.halves, particles: this.particles,
-      trails, cursors: this.cursorPos, score: this.state.score, lives: this.state.lives, highScore: this.highScore,
-      comboText: this.comboText, shake: this.shake, flash: this.flash, now,
+      trails, cursors: this.cursorPos, score: this.state.score, lives: this.state.lives,
+      maxLives: CONFIG.lives, highScore: this.highScore,
+      level: this.state.level, levelName: lv.name,
+      fruitsThisLevel: this.state.fruitsSlicedThisLevel, fruitsToAdvance: lv.fruitsToAdvance,
+      comboText: this.comboText, levelUpText: this.levelUpText,
+      shake: this.shake, flash: this.flash, now,
     })
     this.drawOverlay(now)
   }
 
   private drawOverlay(now: number): void {
     const ctx = this.ctx
-    const { width, height } = CONFIG.canvas
+    const { width, height } = CANVAS_SIZE
     const center = (lines: string[]) => {
       ctx.save()
       ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, width, height)
@@ -312,15 +339,15 @@ export class Game {
       ctx.restore()
     }
     if (this.screen === 'title') {
-      center(['🍉 Fruit Fury', 'Enter — Play   ·   C — Calibrate', `F — toggle camera (${this.showFeed ? 'on' : 'off'})`, `Best ${this.highScore}`])
+      center(['Fruit Fury', 'Enter — Play   |   C — Calibrate', `F — toggle camera (${this.showFeed ? 'on' : 'off'})   |   M — mute (${this.audio.muted ? 'on' : 'off'})`, `Best ${this.highScore}`])
     } else if (this.screen === 'calibrate') {
       const left = Math.max(0, Math.ceil((this.calibUntil - now) / 1000))
-      center(['Calibrate', 'Wave both hands around the area you can comfortably reach', `${left}…`])
+      center(['Calibrate', 'Wave both hands around the area you can comfortably reach', `${left}...`])
     } else if (this.screen === 'countdown') {
       const left = Math.max(1, Math.ceil((this.countdownUntil - now) / 1000))
       center([`${left}`])
     } else if (this.screen === 'gameover') {
-      center(['Game Over', `Score ${this.state.score}   ·   Best ${this.highScore}`, 'Enter — Play again'])
+      center(['Game Over', `Score ${this.state.score}   |   Best ${this.highScore}`, `Reached Level ${this.state.level}`, 'Enter — Play again'])
     }
   }
 }

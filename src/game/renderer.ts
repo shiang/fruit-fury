@@ -1,15 +1,13 @@
-import type { Entity, TrailPoint, Vec2 } from '../types'
+import type { Entity, TrailPoint, Vec2, CanvasSize } from '../types'
 import { CONFIG } from '../config'
+import { drawEntity, drawFruitHalf } from './fruitArt'
 
 export interface Particle { pos: Vec2; vel: Vec2; life: number; maxLife: number; color: string }
-export interface Half { pos: Vec2; vel: Vec2; rotation: number; angularVel: number; color: string; side: -1 | 1; radius: number; life: number }
+export interface Half { pos: Vec2; vel: Vec2; rotation: number; angularVel: number; color: string; type: string; side: -1 | 1; radius: number; life: number }
 
 const FRUIT_COLORS: Record<string, string> = {
-  watermelon: '#e0394e',
-  apple: '#c6303a',
-  orange: '#f59226',
-  lime: '#7ac043',
-  bomb: '#1a1a1a',
+  watermelon: '#e0394e', apple: '#c6303a', orange: '#f59226', lime: '#7ac043',
+  strawberry: '#e01e3c', pineapple: '#e8a820', peach: '#ff9e6d', kiwi: '#7ac043', bomb: '#1a1a1a',
 }
 
 export function fruitColor(type: string): string {
@@ -20,42 +18,46 @@ export interface RenderInput {
   ctx: CanvasRenderingContext2D
   video: HTMLVideoElement | null
   showFeed: boolean
+  canvas: CanvasSize
   entities: Entity[]
   halves: Half[]
   particles: Particle[]
-  trails: TrailPoint[][]      // one trail per hand
-  cursors: Vec2[]             // mapped hand positions for cursor dots
+  trails: TrailPoint[][]
+  cursors: Vec2[]
   score: number
   lives: number
+  maxLives: number
   highScore: number
+  level: number
+  levelName: string
+  fruitsThisLevel: number
+  fruitsToAdvance: number
   comboText: string | null
-  shake: number               // 0..1 intensity
-  flash: number               // 0..1 white flash alpha
+  levelUpText: string | null
+  shake: number
+  flash: number
   now: number
 }
 
 export function render(input: RenderInput): void {
   const { ctx } = input
-  const { width, height } = CONFIG.canvas
+  const { width, height } = input.canvas
   ctx.save()
 
-  // screen shake
   if (input.shake > 0) {
     const m = 16 * input.shake
     ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m)
   }
 
-  // background: dojo wood gradient
   const bg = ctx.createLinearGradient(0, 0, 0, height)
   bg.addColorStop(0, '#5a4226')
   bg.addColorStop(1, '#2e2012')
   ctx.fillStyle = bg
   ctx.fillRect(-40, -40, width + 80, height + 80)
 
-  // dimmed mirrored webcam feed
   if (input.showFeed && input.video && input.video.readyState >= 2) {
     ctx.save()
-    ctx.globalAlpha = 0.28
+    ctx.globalAlpha = 0.22
     ctx.translate(width, 0)
     ctx.scale(-1, 1)
     ctx.drawImage(input.video, 0, 0, width, height)
@@ -68,7 +70,6 @@ export function render(input: RenderInput): void {
   for (const trail of input.trails) drawBlade(ctx, trail, input.now)
   drawCursors(ctx, input.cursors)
 
-  // combo banner
   if (input.comboText) {
     ctx.save()
     ctx.font = 'bold 64px sans-serif'
@@ -81,9 +82,23 @@ export function render(input: RenderInput): void {
     ctx.restore()
   }
 
+  if (input.levelUpText) {
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 72px sans-serif'
+    ctx.fillStyle = '#ffd35e'
+    ctx.strokeStyle = '#6b4a12'
+    ctx.lineWidth = 7
+    ctx.strokeText(input.levelUpText, width / 2, height / 2 - 40)
+    ctx.fillText(input.levelUpText, width / 2, height / 2 - 40)
+    ctx.font = 'bold 36px sans-serif'
+    ctx.fillStyle = '#fff8e7'
+    ctx.fillText(input.levelName, width / 2, height / 2 + 20)
+    ctx.restore()
+  }
+
   drawHud(ctx, input)
 
-  // white flash overlay
   if (input.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${input.flash})`
     ctx.fillRect(-40, -40, width + 80, height + 80)
@@ -96,18 +111,7 @@ function drawEntities(ctx: CanvasRenderingContext2D, entities: Entity[]) {
     ctx.save()
     ctx.translate(e.pos.x, e.pos.y)
     ctx.rotate(e.rotation)
-    if (e.type === 'bomb') {
-      ctx.fillStyle = '#141414'
-      ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2); ctx.fill()
-      ctx.strokeStyle = '#ff5630'; ctx.lineWidth = 3; ctx.stroke()
-      ctx.fillStyle = '#ff7a45'
-      ctx.fillRect(-3, -e.radius - 10, 6, 12) // fuse
-    } else {
-      ctx.fillStyle = fruitColor(e.type)
-      ctx.beginPath(); ctx.arc(0, 0, e.radius, 0, Math.PI * 2); ctx.fill()
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'
-      ctx.beginPath(); ctx.arc(-e.radius * 0.3, -e.radius * 0.3, e.radius * 0.22, 0, Math.PI * 2); ctx.fill()
-    }
+    drawEntity(ctx, e.type, e.radius)
     ctx.restore()
   }
 }
@@ -118,13 +122,7 @@ function drawHalves(ctx: CanvasRenderingContext2D, halves: Half[]) {
     ctx.globalAlpha = Math.max(0, Math.min(1, h.life))
     ctx.translate(h.pos.x, h.pos.y)
     ctx.rotate(h.rotation)
-    ctx.fillStyle = h.color
-    ctx.beginPath()
-    ctx.arc(0, 0, h.radius, h.side === 1 ? -Math.PI / 2 : Math.PI / 2, h.side === 1 ? Math.PI / 2 : (3 * Math.PI) / 2)
-    ctx.closePath()
-    ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'
-    ctx.fillRect(-2, -h.radius, 4, h.radius * 2) // cut face highlight
+    drawFruitHalf(ctx, h.type as Entity['type'], h.radius, h.side)
     ctx.restore()
   }
 }
@@ -160,6 +158,7 @@ function drawBlade(ctx: CanvasRenderingContext2D, trail: TrailPoint[], now: numb
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
+  const { width } = input.canvas
   ctx.save()
   ctx.font = 'bold 32px sans-serif'
   ctx.fillStyle = '#fff8e7'
@@ -167,9 +166,31 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
   ctx.fillText(`Score ${input.score}`, 24, 44)
   ctx.font = '20px sans-serif'
   ctx.fillText(`Best ${input.highScore}`, 24, 72)
+
   ctx.textAlign = 'right'
-  ctx.font = '32px sans-serif'
-  ctx.fillText('❤'.repeat(input.lives) + '·'.repeat(Math.max(0, CONFIG.lives - input.lives)), CONFIG.canvas.width - 24, 44)
+  ctx.font = 'bold 26px sans-serif'
+  ctx.fillStyle = '#ffd35e'
+  ctx.fillText(`Lv ${input.level}`, width - 24, 40)
+  ctx.font = '16px sans-serif'
+  ctx.fillStyle = '#fff8e7'
+  ctx.fillText(input.levelName, width - 24, 62)
+
+  // Level progress bar
+  const barW = 160
+  const barX = width - 24 - barW
+  const barY = 70
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'
+  ctx.fillRect(barX, barY, barW, 6)
+  const prog = input.fruitsToAdvance > 0 ? input.fruitsThisLevel / input.fruitsToAdvance : 0
+  ctx.fillStyle = '#7ac043'
+  ctx.fillRect(barX, barY, barW * Math.min(1, prog), 6)
+
+  // Hearts
+  ctx.font = '28px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#ff4d6d'
+  const hearts = '\u2764'.repeat(input.lives) + '\u00b7'.repeat(Math.max(0, input.maxLives - input.lives))
+  ctx.fillText(hearts, width / 2, 44)
   ctx.restore()
 }
 
