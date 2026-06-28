@@ -11,8 +11,17 @@ import { AudioEngine } from './audio'
 import { hitTestButtons, pointInButton, drawButton, drawMenuCursor, type MenuButton, type MenuIcon } from './menu'
 import { MouseSource } from './camera'
 import type { HandSource, HandSample } from './camera'
+import {
+  createTutorialState,
+  shouldShowTutorial,
+  markTutorialSeen,
+  drawTutorialOverlay,
+  hitTestTutorialButton,
+  getTutorialButtonRect,
+  TUTORIAL_CARDS,
+} from './tutorial'
 
-type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'paused' | 'gameover'
+type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'paused' | 'gameover' | 'tutorial'
 
 export class Game {
   private screen: Screen = 'title'
@@ -52,6 +61,8 @@ export class Game {
   private menuBtnStates = new Map<string, { hover: number; holdProgress: number }>()
   private menuButtons: MenuButton[] = []
   private static readonly MENU_HOLD_S = 0.6
+  private tutorialState = createTutorialState()
+  private tutorialPinchLatch = false
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -72,6 +83,7 @@ export class Game {
     window.addEventListener('resize', () => this.resize())
     this.fallbackEl.addEventListener('click', this.onMenuClick)
     this.resize()
+    if (shouldShowTutorial()) this.showTutorial()
     this.loop()
     this.attachInput()
   }
@@ -109,6 +121,7 @@ export class Game {
     if (key === 'Escape') {
       if (this.screen === 'playing') { this.screen = 'paused'; return }
       if (this.screen === 'paused') { this.screen = 'playing'; return }
+      if (this.screen === 'tutorial') { this.screen = 'title'; return }
     }
     if (key === 'f') this.showFeed = !this.showFeed
     if (key === 'm') this.audio.muted = !this.audio.muted
@@ -119,16 +132,22 @@ export class Game {
   }
 
   private onMenuClick = (e: MouseEvent): void => {
-    if (this.screen !== 'title' && this.screen !== 'gameover' && this.screen !== 'paused') return
     this.audio.init()
     const r = this.ctx.canvas.getBoundingClientRect()
     const scaleX = CANVAS_SIZE.width / r.width
     const scaleY = CANVAS_SIZE.height / r.height
-    const x = (e.clientX - r.left) * scaleX
-    const y = (e.clientY - r.top) * scaleY
+    const pos = { x: (e.clientX - r.left) * scaleX, y: (e.clientY - r.top) * scaleY }
+
+    if (this.screen === 'tutorial') {
+      const btn = getTutorialButtonRect(CANVAS_SIZE.width, CANVAS_SIZE.height)
+      if (hitTestTutorialButton(btn, pos)) this.advanceOrDismissTutorial()
+      return
+    }
+
+    if (this.screen !== 'title' && this.screen !== 'gameover' && this.screen !== 'paused') return
     const buttons = this.buildMenuButtons()
     for (const btn of buttons) {
-      if (pointInButton(btn, x, y)) {
+      if (pointInButton(btn, pos.x, pos.y)) {
         this.activateMenuButton(btn.id)
         return
       }
@@ -150,6 +169,9 @@ export class Game {
         break
       case 'calibrate':
         this.beginCalibration()
+        break
+      case 'howto':
+        this.showTutorial()
         break
       case 'camera':
         this.showFeed = !this.showFeed
@@ -181,13 +203,15 @@ export class Game {
     const bh = Math.min(64, height * 0.085)
 
     if (this.screen === 'title') {
-      let y = height * 0.52
+      let y = height * 0.44
       buttons.push(this.mkBtn('play', 'Play', 'play', cx, y, bw, bh, false, true))
-      y += bh + 18
+      y += bh + 14
       buttons.push(this.mkBtn('zen', 'Zen Mode', 'zen', cx, y, bw, bh, false, true))
-      y += bh + 18
+      y += bh + 14
       buttons.push(this.mkBtn('calibrate', 'Calibrate', 'calibrate', cx, y, bw, bh, false, true))
-      y += bh + 30
+      y += bh + 14
+      buttons.push(this.mkBtn('howto', 'How to Play', 'howto', cx, y, bw, bh, false, true))
+      y += bh + 24
       const tw = Math.min(170, width * 0.2)
       const th = 44
       buttons.push(this.mkBtn('camera', `Camera ${this.showFeed ? 'On' : 'Off'}`, this.showFeed ? 'camera' : 'cameraOff', cx - tw / 2 - 10, y, tw, th, true, this.showFeed))
@@ -242,6 +266,44 @@ export class Game {
   private beginCountdown(): void {
     this.screen = 'countdown'
     this.countdownUntil = performance.now() + 3000
+  }
+
+  private showTutorial(): void {
+    this.screen = 'tutorial'
+    this.tutorialState = createTutorialState()
+    this.tutorialState.isShowing = true
+    this.tutorialState.startTime = performance.now()
+    this.tutorialPinchLatch = false
+  }
+
+  private advanceOrDismissTutorial(): void {
+    const state = this.tutorialState
+    if (state.currentCard < TUTORIAL_CARDS.length - 1) {
+      state.currentCard++
+      this.audio.play('menuclick')
+    } else {
+      markTutorialSeen()
+      state.isShowing = false
+      this.screen = 'title'
+      this.audio.play('menuclick')
+    }
+  }
+
+  private updateTutorial(_now: number, _dt: number): void {
+    const state = this.tutorialState
+    if (!state.isShowing) return
+
+    const cursor = this.cursorPos.length > 0 ? this.cursorPos[0] : null
+    const pinching = this.latestSample.pinching?.[0] ?? false
+
+    if (cursor && pinching && !this.tutorialPinchLatch) {
+      const btn = getTutorialButtonRect(CANVAS_SIZE.width, CANVAS_SIZE.height)
+      if (hitTestTutorialButton(btn, cursor)) {
+        this.tutorialPinchLatch = true
+        this.advanceOrDismissTutorial()
+      }
+    }
+    if (!pinching) this.tutorialPinchLatch = false
   }
 
   private resetGame(mode: GameMode = 'classic'): void {
@@ -315,6 +377,12 @@ export class Game {
 
     if (this.screen === 'countdown') {
       if (now >= this.countdownUntil) this.screen = 'playing'
+    }
+
+    if (this.screen === 'tutorial') {
+      this.updateTutorial(now, dt)
+      this.updateBlades(now)
+      return
     }
 
     if (this.screen !== 'playing') {
@@ -490,7 +558,7 @@ export class Game {
 
   private draw(now: number): void {
     const lv = this.state.levelConfig
-    const isMenu = this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused'
+    const isMenu = this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused' || this.screen === 'tutorial'
     const showStandardCursor = !isMenu
     render({
       ctx: this.ctx, video: this.video, showFeed: this.showFeed, showHud: this.screen === 'playing' || this.screen === 'countdown', canvas: CANVAS_SIZE,
@@ -528,10 +596,12 @@ export class Game {
       } else {
         this.drawSimpleOverlay(ctx, width, height, [`${left}`])
       }
+    } else if (this.screen === 'tutorial') {
+      drawTutorialOverlay(ctx, this.tutorialState, now, width, height)
     }
 
-    // Menu cursor with hold progress
-    if ((this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused') && this.cursorPos.length > 0) {
+    // Cursor (menu screens + tutorial)
+    if ((this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused' || this.screen === 'tutorial') && this.cursorPos.length > 0) {
       const cursor = this.cursorPos[0]
       const pinching = this.latestSample.pinching?.[0] ?? false
       const hoveredBtn = this.menuButtons.length > 0

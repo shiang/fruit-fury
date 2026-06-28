@@ -2,7 +2,7 @@ import type { Vec2 } from '../types'
 
 type Ctx = CanvasRenderingContext2D
 
-export type MenuIcon = 'play' | 'calibrate' | 'camera' | 'cameraOff' | 'sound' | 'soundOff' | 'restart' | 'pause' | 'quit' | 'zen'
+export type MenuIcon = 'play' | 'calibrate' | 'camera' | 'cameraOff' | 'sound' | 'soundOff' | 'restart' | 'pause' | 'quit' | 'zen' | 'howto'
 
 export interface MenuButton {
   id: string
@@ -294,6 +294,24 @@ export function drawIcon(ctx: Ctx, icon: MenuIcon, x: number, y: number, size: n
       ctx.moveTo(x + size * 0.35, y - size * 0.35)
       ctx.lineTo(x - size * 0.35, y + size * 0.35)
       ctx.stroke()
+      break
+    }
+    case 'howto': {
+      ctx.lineWidth = size * 0.09
+      ctx.lineCap = 'round'
+      // Question mark curve
+      ctx.beginPath()
+      ctx.arc(x, y - size * 0.18, size * 0.22, Math.PI, Math.PI * 2.2, false)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(x + size * 0.18, y - size * 0.18)
+      ctx.lineTo(x, y + size * 0.05)
+      ctx.stroke()
+      // Dot
+      ctx.beginPath()
+      ctx.arc(x, y + size * 0.2, size * 0.05, 0, Math.PI * 2)
+      ctx.fill()
+      break
     }
   }
   ctx.restore()
