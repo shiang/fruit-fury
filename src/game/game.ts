@@ -42,6 +42,7 @@ export class Game {
   private slowMoOverlay = 0
   private timerWarnPlayed = false
   private timerEndPlayed = false
+  private gameOverReason: 'lives' | 'timeup' | null = null
 
   private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
   private mouse: MouseSource | null = null
@@ -256,6 +257,9 @@ export class Game {
     this.smoothedPos = [null, null]
     this.levelUpText = null
     this.menuBtnStates.clear()
+    this.gameOverReason = null
+    this.timerWarnPlayed = false
+    this.timerEndPlayed = false
     
     // Zen mode: fix level to 3, enable timer by default
     if (mode === 'zen') {
@@ -350,6 +354,7 @@ export class Game {
           this.timerEndPlayed = true
           this.audio.play('timeend')
         }
+        this.gameOverReason = 'timeup'
         this.screen = 'gameover' // soft end for zen
         this.saveHighScore()
         return
@@ -418,6 +423,7 @@ export class Game {
 
   private endGameIfOver(): void {
     if (!this.state.isOver) return
+    this.gameOverReason = 'lives'
     this.saveHighScore()
     this.screen = 'gameover'
   }
@@ -618,11 +624,23 @@ export class Game {
     const titleY = height * 0.25
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.shadowColor = 'rgba(200,30,40,0.5)'
-    ctx.shadowBlur = 25
-    ctx.font = `bold ${titleSize}px sans-serif`
-    ctx.fillStyle = '#e0394e'
-    ctx.fillText('GAME OVER', cx, titleY)
+    
+    if (this.gameMode === 'zen') {
+      // Zen mode: soft colors
+      const reason = this.gameOverReason === 'timeup' ? "Time's Up!" : 'Run Complete'
+      ctx.shadowColor = 'rgba(135,206,235,0.5)'
+      ctx.shadowBlur = 20
+      ctx.font = `bold ${titleSize}px sans-serif`
+      ctx.fillStyle = '#87ceeb'
+      ctx.fillText(reason, cx, titleY)
+    } else {
+      // Classic mode: red
+      ctx.shadowColor = 'rgba(200,30,40,0.5)'
+      ctx.shadowBlur = 25
+      ctx.font = `bold ${titleSize}px sans-serif`
+      ctx.fillStyle = '#e0394e'
+      ctx.fillText('GAME OVER', cx, titleY)
+    }
 
     // Stats panel
     ctx.shadowBlur = 0
