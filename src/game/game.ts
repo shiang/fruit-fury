@@ -40,6 +40,8 @@ export class Game {
   private shake = 0
   private flash = 0
   private slowMoOverlay = 0
+  private timerWarnPlayed = false
+  private timerEndPlayed = false
 
   private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
   private mouse: MouseSource | null = null
@@ -255,11 +257,11 @@ export class Game {
     this.levelUpText = null
     this.menuBtnStates.clear()
     
-    // Zen mode: fix level to 3, disable timer by default
+    // Zen mode: fix level to 3, enable timer by default
     if (mode === 'zen') {
       this.state.level = CONFIG.zen.level
-      this.state.timerActive = false
-      this.state.timeRemaining = 0
+      this.state.timerActive = true
+      this.state.timeRemaining = this.state.timerDurationMs
       this.state.timerRunning = false
     }
   }
@@ -334,9 +336,20 @@ export class Game {
     // Zen mode timer
     if (this.gameMode === 'zen' && this.state.timerActive && this.state.timerRunning) {
       this.state.timeRemaining -= dt * 1000
+      
+      // One-shot warning at 10s
+      if (this.state.timeRemaining <= 10000 && this.state.timeRemaining > 10000 - dt * 1000 && !this.timerWarnPlayed) {
+        this.timerWarnPlayed = true
+        this.audio.play('timewarn')
+      }
+      
       if (this.state.timeRemaining <= 0) {
         this.state.timeRemaining = 0
         this.state.timerRunning = false
+        if (!this.timerEndPlayed) {
+          this.timerEndPlayed = true
+          this.audio.play('timeend')
+        }
         this.screen = 'gameover' // soft end for zen
         this.saveHighScore()
         return
@@ -517,6 +530,7 @@ export class Game {
       mode: this.gameMode,
       timerActive: this.state.timerActive,
       timeRemaining: this.state.timeRemaining,
+      timerDurationMs: this.state.timerDurationMs,
     })
     this.drawOverlay(now)
   }

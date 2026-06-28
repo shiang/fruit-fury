@@ -44,6 +44,7 @@ export interface RenderInput {
   mode: 'classic' | 'zen'
   timerActive: boolean
   timeRemaining: number
+  timerDurationMs: number
 }
 
 export function render(input: RenderInput): void {
@@ -193,6 +194,17 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
       ctx.font = 'bold 20px sans-serif'
       ctx.fillStyle = '#fff8e7'
       ctx.fillText(`${mins}:${s.toString().padStart(2, '0')}`, width - 24, 68)
+      
+      // Timer progress bar
+      const barW = 160
+      const barX = width - 24 - barW
+      const barY = 78
+      ctx.fillStyle = 'rgba(255,255,255,0.2)'
+      ctx.fillRect(barX, barY, barW, 6)
+      const prog = input.timeRemaining / input.timerDurationMs
+      const barColor = prog < 0.2 ? '#ff4d6d' : '#87ceeb'
+      ctx.fillStyle = barColor
+      ctx.fillRect(barX, barY, barW * Math.min(1, prog), 6)
     }
   } else {
     // Classic mode: show level

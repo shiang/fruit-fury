@@ -1,6 +1,6 @@
 import { CONFIG } from '../config'
 
-type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal' | 'slowmo'
+type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal' | 'slowmo' | 'timewarn' | 'timeend'
 
 /** Procedural sound effects via Web Audio API — no audio files needed. */
 export class AudioEngine {
@@ -43,6 +43,8 @@ export class AudioEngine {
       case 'menuclick': this.menuClick(); break
       case 'heal': this.heal(); break
       case 'slowmo': this.slowMo(); break
+      case 'timewarn': this.timeWarn(); break
+      case 'timeend': this.timeEnd(); break
     }
   }
 
@@ -142,5 +144,17 @@ export class AudioEngine {
     osc.stop(t0 + 0.6)
     // Second harmonic for sparkle
     this.tone(1800, 0.3, 'sine', 0.08, 2600, 0.05)
+  }
+
+  private timeWarn(): void {
+    // Gentle chime: high sine tone with soft attack
+    this.tone(880, 0.15, 'sine', 0.2)
+    this.tone(1108, 0.15, 'sine', 0.15, undefined, 0.1)
+  }
+
+  private timeEnd(): void {
+    // Soft bell: two tones, descending
+    this.tone(660, 0.3, 'sine', 0.25, 440)
+    this.tone(440, 0.4, 'sine', 0.2, 220, 0.2)
   }
 }

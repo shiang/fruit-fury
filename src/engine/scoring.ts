@@ -14,8 +14,9 @@ export class GameState {
   mode: GameMode = 'classic'
 
   // Zen mode timer state
-  timerActive = false
-  timeRemaining = 0
+  timerDurationMs: number = CONFIG.zen.timerDurationMs // mutable, not in CONFIG (which is as const)
+  timerActive = true // default ON for zen
+  timeRemaining: number = CONFIG.zen.timerDurationMs
   timerRunning = false
 
   private comboCount = 0
