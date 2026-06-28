@@ -551,7 +551,11 @@ export class Game {
       this.drawSimpleOverlay(ctx, width, height, ['Calibrate', 'Wave both hands around the area you can comfortably reach', `${left}...`])
     } else if (this.screen === 'countdown') {
       const left = Math.max(1, Math.ceil((this.countdownUntil - now) / 1000))
-      this.drawSimpleOverlay(ctx, width, height, [`${left}`])
+      if (this.gameMode === 'zen') {
+        this.drawSimpleOverlay(ctx, width, height, ['ZEN MODE', 'No bombs, no lives, slice freely', `${left}...`])
+      } else {
+        this.drawSimpleOverlay(ctx, width, height, [`${left}`])
+      }
     }
 
     // Menu cursor with hold progress
