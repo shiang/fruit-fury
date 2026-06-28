@@ -18,13 +18,22 @@ describe('GameState', () => {
     expect(g.fruitsSlicedThisLevel).toBe(1)
   })
 
-  it('awards a combo bonus for 3+ fruit within the combo window', () => {
+  it('applies combo chain multiplier: each slice in a combo is worth comboCount x base', () => {
     const g = new GameState()
-    g.sliceFruit(0)
-    g.sliceFruit(50)
-    g.sliceFruit(100)   // 3 within 220ms -> combo
-    expect(g.score).toBe(30 + 50)
+    g.sliceFruit(0)      // combo 1: 10*1 = 10
+    g.sliceFruit(50)     // combo 2: 10*2 = 20
+    g.sliceFruit(100)    // combo 3: 10*3 = 30
+    expect(g.score).toBe(60)  // 10 + 20 + 30
     expect(g.lastCombo).toBe(3)
+  })
+
+  it('resets combo when slices are spread beyond the window', () => {
+    const g = new GameState()
+    g.sliceFruit(0)      // combo 1: 10
+    g.sliceFruit(300)    // gap > 220ms -> reset to combo 1: 10
+    g.sliceFruit(600)    // combo 1 again: 10
+    expect(g.lastCombo).toBe(1)
+    expect(g.score).toBe(30)
   })
 
   it('does not combo when slices are spread beyond the window', () => {
@@ -81,5 +90,33 @@ describe('GameState', () => {
     expect(g.lives).toBe(4)
     expect(g.heal(1)).toBe(1)
     expect(g.heal(10)).toBe(0)
+  })
+
+  describe('slow-motion', () => {
+    it('starts with normal time scale (1.0)', () => {
+      const g = new GameState()
+      expect(g.isSlowMoActive(0)).toBe(1)
+    })
+
+    it('returns 0.3 time scale while active', () => {
+      const g = new GameState()
+      g.activateSlowMo(1000)
+      expect(g.isSlowMoActive(2000)).toBe(0.3)
+    })
+
+    it('returns 1.0 after duration expires', () => {
+      const g = new GameState()
+      g.activateSlowMo(0)
+      expect(g.isSlowMoActive(4000)).toBe(1)
+    })
+
+    it('extends duration on re-activation', () => {
+      const g = new GameState()
+      g.activateSlowMo(0)
+      expect(g.isSlowMoActive(2000)).toBe(0.3)
+      g.activateSlowMo(2000)
+      expect(g.isSlowMoActive(4500)).toBe(0.3)
+      expect(g.isSlowMoActive(5000)).toBe(1)
+    })
   })
 })

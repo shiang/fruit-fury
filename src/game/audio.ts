@@ -1,6 +1,6 @@
 import { CONFIG } from '../config'
 
-type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal'
+type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal' | 'slowmo'
 
 /** Procedural sound effects via Web Audio API — no audio files needed. */
 export class AudioEngine {
@@ -42,6 +42,7 @@ export class AudioEngine {
       case 'levelup': this.levelUp(); break
       case 'menuclick': this.menuClick(); break
       case 'heal': this.heal(); break
+      case 'slowmo': this.slowMo(); break
     }
   }
 
@@ -123,5 +124,23 @@ export class AudioEngine {
   private heal(): void {
     this.tone(784, 0.12, 'sine', 0.2)
     this.tone(1047, 0.16, 'sine', 0.18, undefined, 0.08)
+  }
+
+  private slowMo(): void {
+    const ctx = this.ctx!
+    const t0 = ctx.currentTime
+    // Icy shimmer: high sine sweep up + reverb-like tail
+    const osc = ctx.createOscillator()
+    const g = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(1200, t0)
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, 2400), t0 + 0.2)
+    g.gain.setValueAtTime(0.15, t0)
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6)
+    osc.connect(g).connect(this.master!)
+    osc.start(t0)
+    osc.stop(t0 + 0.6)
+    // Second harmonic for sparkle
+    this.tone(1800, 0.3, 'sine', 0.08, 2600, 0.05)
   }
 }

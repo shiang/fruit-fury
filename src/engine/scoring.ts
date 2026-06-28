@@ -9,6 +9,7 @@ export class GameState {
   lastCombo = 0
   level = 1
   fruitsSlicedThisLevel = 0
+  slowMoUntil = 0
 
   private comboCount = 0
   private comboLastT = -Infinity
@@ -28,10 +29,8 @@ export class GameState {
     this.comboLastT = t
     this.lastCombo = this.comboCount
 
-    this.score += CONFIG.points.fruit
-    if (this.comboCount >= CONFIG.combo.minForBonus) {
-      this.score += CONFIG.combo.bonusPerExtra * (this.comboCount - (CONFIG.combo.minForBonus - 1))
-    }
+    // Combo chain multiplier: each slice in a combo is worth comboCount x base points
+    this.score += CONFIG.points.fruit * this.comboCount
     this.fruitsSlicedThisLevel += 1
   }
 
@@ -61,6 +60,19 @@ export class GameState {
       return true
     }
     return false
+  }
+
+  /** Check if slow-motion is currently active. Returns time scale (1 = normal, 0.3 = slow). */
+  isSlowMoActive(now: number): number {
+    if (now < this.slowMoUntil) {
+      return 0.3 // 30% speed
+    }
+    return 1
+  }
+
+  /** Activate slow-motion for the configured duration. */
+  activateSlowMo(now: number): void {
+    this.slowMoUntil = now + CONFIG.slowMo.durationMs
   }
 
   private loseLife(): void {

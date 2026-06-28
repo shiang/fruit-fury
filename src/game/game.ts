@@ -38,6 +38,7 @@ export class Game {
   private levelUpTextUntil = 0
   private shake = 0
   private flash = 0
+  private slowMoOverlay = 0
 
   private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
   private mouse: MouseSource | null = null
@@ -281,6 +282,7 @@ export class Game {
   private update(now: number, dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 3)
     this.flash = Math.max(0, this.flash - dt * 4)
+    this.slowMoOverlay = Math.max(0, this.slowMoOverlay - dt * 1.5)
     if (this.comboText && now > this.comboTextUntil) this.comboText = null
     if (this.levelUpText && now > this.levelUpTextUntil) this.levelUpText = null
 
@@ -321,9 +323,10 @@ export class Game {
     }
 
     // integrate + cull misses
+    const timeScale = this.state.isSlowMoActive(now)
     const survivors: Entity[] = []
     for (const e of this.entities) {
-      const moved = integrate(e, dt, lv.gravity)
+      const moved = integrate(e, dt * timeScale, lv.gravity)
       if (moved.pos.y - moved.radius > CANVAS_SIZE.height && moved.vel.y > 0) {
         if (moved.type !== 'bomb' && moved.type !== 'heart' && moved.type !== 'golden-heart') {
           this.state.missFruit()
@@ -343,6 +346,7 @@ export class Game {
           e.sliced = true
           if (e.type === 'bomb') this.onBomb(e)
           else if (e.type === 'heart' || e.type === 'golden-heart') this.onBonus(e, now)
+          else if (e.type === 'slow-mo') this.onSlowMo(e, now)
           else this.onSlice(e, now)
         }
       }
@@ -377,7 +381,7 @@ export class Game {
     this.spawnHalves(e)
     this.spawnParticles(e.pos, fruitColor(e.type))
     this.audio.play('slice')
-    if (this.state.lastCombo >= CONFIG.combo.minForBonus) {
+    if (this.state.lastCombo >= 2) {
       this.comboText = `Combo x${this.state.lastCombo}!`
       this.comboTextUntil = now + 900
       this.flash = Math.min(1, this.flash + 0.5)
@@ -403,6 +407,15 @@ export class Game {
       this.comboTextUntil = now + 1000
     }
     this.audio.play('heal')
+  }
+
+  private onSlowMo(e: Entity, now: number): void {
+    this.state.activateSlowMo(now)
+    this.spawnParticles(e.pos, '#87ceeb', 24)
+    this.slowMoOverlay = 1
+    this.comboText = 'Slow Motion!'
+    this.comboTextUntil = now + 1200
+    this.audio.play('slowmo')
   }
 
   private spawnHalves(e: Entity): void {
@@ -458,8 +471,8 @@ export class Game {
       maxLives: CONFIG.lives, highScore: this.highScore,
       level: this.state.level, levelName: lv.name,
       fruitsThisLevel: this.state.fruitsSlicedThisLevel, fruitsToAdvance: lv.fruitsToAdvance,
-      comboText: this.comboText, levelUpText: this.levelUpText,
-      shake: this.shake, flash: this.flash, now,
+      comboCount: this.state.lastCombo, comboText: this.comboText, levelUpText: this.levelUpText,
+      shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, now,
     })
     this.drawOverlay(now)
   }

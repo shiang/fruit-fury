@@ -34,10 +34,12 @@ export interface RenderInput {
   levelName: string
   fruitsThisLevel: number
   fruitsToAdvance: number
+  comboCount: number
   comboText: string | null
   levelUpText: string | null
   shake: number
   flash: number
+  slowMoOverlay: number
   now: number
 }
 
@@ -103,6 +105,11 @@ export function render(input: RenderInput): void {
 
   if (input.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${input.flash})`
+    ctx.fillRect(-40, -40, width + 80, height + 80)
+  }
+
+  if (input.slowMoOverlay > 0) {
+    ctx.fillStyle = `rgba(100,180,255,${input.slowMoOverlay * 0.12})`
     ctx.fillRect(-40, -40, width + 80, height + 80)
   }
   ctx.restore()
@@ -176,6 +183,14 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
   ctx.font = '16px sans-serif'
   ctx.fillStyle = '#fff8e7'
   ctx.fillText(input.levelName, width - 24, 62)
+
+  // Combo multiplier display
+  if (input.comboCount > 1) {
+    ctx.font = 'bold 24px sans-serif'
+    ctx.fillStyle = '#ffd35e'
+    ctx.textAlign = 'left'
+    ctx.fillText(`x${input.comboCount}`, 24, 100)
+  }
 
   // Level progress bar
   const barW = 160

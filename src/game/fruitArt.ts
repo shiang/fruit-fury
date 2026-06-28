@@ -248,7 +248,42 @@ function drawKiwi(ctx: Ctx, r: number): void {
 export function drawEntity(ctx: Ctx, type: EntityType, radius: number): void {
   if (type === 'bomb') drawBomb(ctx, radius)
   else if (type === 'heart' || type === 'golden-heart') drawBonus(ctx, type, radius)
+  else if (type === 'slow-mo') drawSlowMoFruit(ctx, radius)
   else drawFruit(ctx, type, radius)
+}
+
+function drawSlowMoFruit(ctx: Ctx, r: number): void {
+  // Outer glow
+  const glow = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r * 1.5)
+  glow.addColorStop(0, 'rgba(100,200,255,0.4)')
+  glow.addColorStop(1, 'rgba(100,200,255,0)')
+  ctx.fillStyle = glow
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2); ctx.fill()
+
+  // Fruit body - icy blue
+  const grad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, 0, 0, 0, r)
+  grad.addColorStop(0, '#87ceeb')
+  grad.addColorStop(0.7, '#4a90d9')
+  grad.addColorStop(1, '#2c5f8a')
+  ctx.fillStyle = grad
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
+
+  // Ice crystals
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'
+  ctx.lineWidth = 2
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + performance.now() * 0.001
+    const x = Math.cos(a) * r * 0.6
+    const y = Math.sin(a) * r * 0.6
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9)
+    ctx.stroke()
+  }
+
+  // Snowflake center
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.25, 0, Math.PI * 2); ctx.fill()
 }
 
 export function drawFruitHalf(ctx: Ctx, type: EntityType, r: number, side: -1 | 1): void {

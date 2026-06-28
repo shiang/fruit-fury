@@ -13,6 +13,7 @@ export function makeSpawn(rng: () => number, canvas: CanvasSize, level: LevelCon
   const roll = rng()
   const goldenThreshold = level.bombChance + CONFIG.bonus.goldenHeartChance
   const heartThreshold = goldenThreshold + CONFIG.bonus.heartChance
+  const slowMoThreshold = heartThreshold + CONFIG.slowMo.chance
 
   let type: SpawnEvent['type']
   let radius: number
@@ -25,6 +26,9 @@ export function makeSpawn(rng: () => number, canvas: CanvasSize, level: LevelCon
     radius = level.fruitRadius
   } else if (roll < heartThreshold) {
     type = 'heart'
+    radius = level.fruitRadius
+  } else if (roll < slowMoThreshold) {
+    type = 'slow-mo'
     radius = level.fruitRadius
   } else {
     type = FRUITS[Math.floor(rng() * FRUITS.length) % FRUITS.length]
