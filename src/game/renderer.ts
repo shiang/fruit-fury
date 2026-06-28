@@ -58,8 +58,13 @@ export function render(input: RenderInput): void {
   }
 
   const bg = ctx.createLinearGradient(0, 0, 0, height)
-  bg.addColorStop(0, '#5a4226')
-  bg.addColorStop(1, '#2e2012')
+  if (input.mode === 'zen') {
+    bg.addColorStop(0, '#b8d4e3')
+    bg.addColorStop(1, '#7ab8d4')
+  } else {
+    bg.addColorStop(0, '#5a4226')
+    bg.addColorStop(1, '#2e2012')
+  }
   ctx.fillStyle = bg
   ctx.fillRect(-40, -40, width + 80, height + 80)
 
@@ -182,10 +187,16 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
 
   // Zen mode: show timer instead of level
   if (input.mode === 'zen') {
+    // Pulsing ZEN badge
+    const pulse = 1 + 0.05 * Math.sin(input.now * 0.004)
     ctx.textAlign = 'right'
     ctx.font = 'bold 26px sans-serif'
     ctx.fillStyle = '#87ceeb'
-    ctx.fillText('ZEN', width - 24, 40)
+    ctx.save()
+    ctx.translate(width - 24, 40)
+    ctx.scale(pulse, pulse)
+    ctx.fillText('ZEN', 0, 0)
+    ctx.restore()
     
     if (input.timerActive) {
       const secs = Math.ceil(input.timeRemaining / 1000)
@@ -220,8 +231,8 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
   // Combo multiplier display
   if (input.comboCount > 1) {
     ctx.font = 'bold 24px sans-serif'
-    ctx.fillStyle = '#ffd35e'
     ctx.textAlign = 'left'
+    ctx.fillStyle = input.mode === 'zen' ? '#b8d4e3' : '#ffd35e'
     ctx.fillText(`x${input.comboCount}`, 24, 100)
   }
 
