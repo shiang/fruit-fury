@@ -12,6 +12,9 @@ const LEVELS: LevelConfig[] = [
   { level: 6,  name: 'Orchard Blitz',     fruitsToAdvance: 28, spawnIntervalMs: 900,  bombChance: 0.15, goldenHeartChance: 0.008, heartChance: 0.025, slowMoChance: 0.04, peakHeightMin: 0.28, peakHeightMax: 0.36, gravity: 1100, burstCount: 3, horizontalDrift: 320, fruitRadius: 46, bombRadius: 40 },
   { level: 7,  name: 'Bomb Garden',       fruitsToAdvance: 34, spawnIntervalMs: 800,  bombChance: 0.18, goldenHeartChance: 0.008, heartChance: 0.025, slowMoChance: 0.04, peakHeightMin: 0.32, peakHeightMax: 0.40, gravity: 1150, burstCount: 3, horizontalDrift: 360, fruitRadius: 42, bombRadius: 38 },
   { level: 8,  name: 'Fruit Fury',        fruitsToAdvance: 40, spawnIntervalMs: 700,  bombChance: 0.22, goldenHeartChance: 0.008, heartChance: 0.025, slowMoChance: 0.04, peakHeightMin: 0.36, peakHeightMax: 0.46, gravity: 1200, burstCount: 3, horizontalDrift: 400, fruitRadius: 38, bombRadius: 36 },
+
+  // Zen mode — endless, no bombs, no hearts, no lives. Fixed level 3 difficulty.
+  { level: 99, name: 'Zen Garden',        fruitsToAdvance: 14, spawnIntervalMs: 1200, bombChance: 0, goldenHeartChance: 0, heartChance: 0, slowMoChance: 0.08, peakHeightMin: 0.16, peakHeightMax: 0.24, gravity: 1050, burstCount: 2, horizontalDrift: 200, fruitRadius: 58, bombRadius: 42 },
 ]
 
 const PREDEFINED_COUNT = LEVELS.length

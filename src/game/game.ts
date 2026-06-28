@@ -40,8 +40,6 @@ export class Game {
   private shake = 0
   private flash = 0
   private slowMoOverlay = 0
-  private timerWarnPlayed = false
-  private timerEndPlayed = false
   private gameOverReason: 'lives' | 'timeup' | null = null
 
   private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
@@ -258,15 +256,10 @@ export class Game {
     this.levelUpText = null
     this.menuBtnStates.clear()
     this.gameOverReason = null
-    this.timerWarnPlayed = false
-    this.timerEndPlayed = false
     
-    // Zen mode: fix level to 3, enable timer by default
+    // Zen mode: use dedicated zen level (no bombs, no hearts)
     if (mode === 'zen') {
       this.state.level = CONFIG.zen.level
-      this.state.timerActive = true
-      this.state.timeRemaining = this.state.timerDurationMs
-      this.state.timerRunning = false
     }
   }
 
@@ -336,30 +329,6 @@ export class Game {
     // PLAYING
     const { segments } = this.updateBlades(now)
     const lv = this.state.levelConfig
-
-    // Zen mode timer
-    if (this.gameMode === 'zen' && this.state.timerActive && this.state.timerRunning) {
-      this.state.timeRemaining -= dt * 1000
-      
-      // One-shot warning at 10s
-      if (this.state.timeRemaining <= 10000 && this.state.timeRemaining > 10000 - dt * 1000 && !this.timerWarnPlayed) {
-        this.timerWarnPlayed = true
-        this.audio.play('timewarn')
-      }
-      
-      if (this.state.timeRemaining <= 0) {
-        this.state.timeRemaining = 0
-        this.state.timerRunning = false
-        if (!this.timerEndPlayed) {
-          this.timerEndPlayed = true
-          this.audio.play('timeend')
-        }
-        this.gameOverReason = 'timeup'
-        this.screen = 'gameover' // soft end for zen
-        this.saveHighScore()
-        return
-      }
-    }
 
     // spawn
     this.spawnTimer -= dt * 1000
@@ -534,9 +503,6 @@ export class Game {
       comboCount: this.state.lastCombo, comboText: this.comboText, levelUpText: this.levelUpText,
       shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, now,
       mode: this.gameMode,
-      timerActive: this.state.timerActive,
-      timeRemaining: this.state.timeRemaining,
-      timerDurationMs: this.state.timerDurationMs,
     })
     this.drawOverlay(now)
   }

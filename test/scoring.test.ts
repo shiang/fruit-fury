@@ -166,13 +166,5 @@ describe('GameState', () => {
       const g = new GameState()
       expect(g.comboWindowMs).toBe(220)
     })
-
-    it('timer defaults to active and 90s', () => {
-      const g = new GameState()
-      g.mode = 'zen'
-      expect(g.timerActive).toBe(true)
-      expect(g.timerDurationMs).toBe(90000)
-      expect(g.timeRemaining).toBe(90000)
-    })
   })
 })

@@ -22,13 +22,12 @@ export const CONFIG = {
   highScoreKey: 'fruitFury.highScore',
   highScoreZenKey: 'fruitFury.highScore.zen',
   zen: {
-    level: 3,
+    level: 99,
     bombChance: 0,
     heartChance: 0,
     goldenHeartChance: 0,
     slowMoChance: 0.08,
     spawnIntervalMs: 1200,
     comboWindowMs: 400,
-    timerDurationMs: 90000,
   },
 } as const
