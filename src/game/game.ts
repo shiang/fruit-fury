@@ -1,5 +1,5 @@
 import { CONFIG, CANVAS_SIZE } from '../config'
-import type { Entity, TrailPoint, Vec2 } from '../types'
+import type { Entity, TrailPoint, Vec2, GameMode } from '../types'
 import { mapToGame } from '../engine/mapping'
 import { BladeTracker } from '../engine/bladeTracker'
 import { segmentHitsCircle } from '../engine/collision'
@@ -16,12 +16,13 @@ type Screen = 'title' | 'calibrate' | 'countdown' | 'playing' | 'paused' | 'game
 
 export class Game {
   private screen: Screen = 'title'
+  private gameMode: GameMode = 'classic'
   private trackers: BladeTracker[] = []
   private entities: Entity[] = []
   private halves: Half[] = []
   private particles: Particle[] = []
   private state = new GameState()
-  private highScore = Number(localStorage.getItem(CONFIG.highScoreKey) ?? 0)
+  private highScore = 0
   private showFeed = true
   private audio = new AudioEngine()
 
@@ -139,7 +140,11 @@ export class Game {
     this.menuBtnStates.clear()
     switch (id) {
       case 'play':
-        if (this.screen === 'gameover') this.resetGame()
+        if (this.screen === 'gameover') this.resetGame('classic')
+        this.beginCountdown()
+        break
+      case 'zen':
+        if (this.screen === 'gameover') this.resetGame('zen')
         this.beginCountdown()
         break
       case 'calibrate':
@@ -178,6 +183,8 @@ export class Game {
       let y = height * 0.52
       buttons.push(this.mkBtn('play', 'Play', 'play', cx, y, bw, bh, false, true))
       y += bh + 18
+      buttons.push(this.mkBtn('zen', 'Zen Mode', 'zen', cx, y, bw, bh, false, true))
+      y += bh + 18
       buttons.push(this.mkBtn('calibrate', 'Calibrate', 'calibrate', cx, y, bw, bh, false, true))
       y += bh + 30
       const tw = Math.min(170, width * 0.2)
@@ -185,8 +192,12 @@ export class Game {
       buttons.push(this.mkBtn('camera', `Camera ${this.showFeed ? 'On' : 'Off'}`, this.showFeed ? 'camera' : 'cameraOff', cx - tw / 2 - 10, y, tw, th, true, this.showFeed))
       buttons.push(this.mkBtn('sound', `Sound ${this.audio.muted ? 'Off' : 'On'}`, this.audio.muted ? 'soundOff' : 'sound', cx + tw / 2 + 10, y, tw, th, true, !this.audio.muted))
     } else if (this.screen === 'gameover') {
-      const y = height * 0.60
+      let y = height * 0.60
       buttons.push(this.mkBtn('play', 'Play Again', 'restart', cx, y, bw, bh, false, true))
+      if (this.gameMode === 'zen') {
+        y += bh + 18
+        buttons.push(this.mkBtn('zen', 'Zen Again', 'zen', cx, y, bw, bh, false, true))
+      }
     } else if (this.screen === 'paused') {
       let y = height * 0.42
       buttons.push(this.mkBtn('resume', 'Resume', 'play', cx, y, bw, bh, false, true))
@@ -232,14 +243,25 @@ export class Game {
     this.countdownUntil = performance.now() + 3000
   }
 
-  private resetGame(): void {
+  private resetGame(mode: GameMode = 'classic'): void {
     this.entities = []; this.halves = []; this.particles = []
     this.state = new GameState()
+    this.state.mode = mode
+    this.gameMode = mode
+    this.highScore = Number(localStorage.getItem(mode === 'zen' ? CONFIG.highScoreZenKey : CONFIG.highScoreKey) ?? 0)
     this.spawnTimer = 0
     this.trackers.forEach((t) => t.reset())
     this.smoothedPos = [null, null]
     this.levelUpText = null
     this.menuBtnStates.clear()
+    
+    // Zen mode: fix level to 3, disable timer by default
+    if (mode === 'zen') {
+      this.state.level = CONFIG.zen.level
+      this.state.timerActive = false
+      this.state.timeRemaining = 0
+      this.state.timerRunning = false
+    }
   }
 
   private loop = (): void => {
@@ -309,6 +331,18 @@ export class Game {
     const { segments } = this.updateBlades(now)
     const lv = this.state.levelConfig
 
+    // Zen mode timer
+    if (this.gameMode === 'zen' && this.state.timerActive && this.state.timerRunning) {
+      this.state.timeRemaining -= dt * 1000
+      if (this.state.timeRemaining <= 0) {
+        this.state.timeRemaining = 0
+        this.state.timerRunning = false
+        this.screen = 'gameover' // soft end for zen
+        this.saveHighScore()
+        return
+      }
+    }
+
     // spawn
     this.spawnTimer -= dt * 1000
     if (this.spawnTimer <= 0) {
@@ -330,7 +364,7 @@ export class Game {
       if (moved.pos.y - moved.radius > CANVAS_SIZE.height && moved.vel.y > 0) {
         if (moved.type !== 'bomb' && moved.type !== 'heart' && moved.type !== 'golden-heart') {
           this.state.missFruit()
-          this.audio.play('miss')
+          if (this.gameMode !== 'zen') this.audio.play('miss')
         }
         continue
       }
@@ -360,20 +394,27 @@ export class Game {
 
   private checkLevelUp(now: number): void {
     if (this.state.checkLevelUp()) {
-      this.levelUpText = `Level ${this.state.level}!`
-      this.levelUpTextUntil = now + 2000
-      this.flash = Math.min(1, this.flash + 0.6)
-      this.audio.play('levelup')
+      if (this.gameMode !== 'zen') {
+        this.levelUpText = `Level ${this.state.level}!`
+        this.levelUpTextUntil = now + 2000
+        this.flash = Math.min(1, this.flash + 0.6)
+        this.audio.play('levelup')
+      }
     }
   }
 
   private endGameIfOver(): void {
     if (!this.state.isOver) return
+    this.saveHighScore()
+    this.screen = 'gameover'
+  }
+
+  private saveHighScore(): void {
     if (this.state.score > this.highScore) {
       this.highScore = this.state.score
-      localStorage.setItem(CONFIG.highScoreKey, String(this.highScore))
+      const key = this.gameMode === 'zen' ? CONFIG.highScoreZenKey : CONFIG.highScoreKey
+      localStorage.setItem(key, String(this.highScore))
     }
-    this.screen = 'gameover'
   }
 
   private onSlice(e: Entity, now: number): void {
@@ -473,6 +514,9 @@ export class Game {
       fruitsThisLevel: this.state.fruitsSlicedThisLevel, fruitsToAdvance: lv.fruitsToAdvance,
       comboCount: this.state.lastCombo, comboText: this.comboText, levelUpText: this.levelUpText,
       shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, now,
+      mode: this.gameMode,
+      timerActive: this.state.timerActive,
+      timeRemaining: this.state.timeRemaining,
     })
     this.drawOverlay(now)
   }

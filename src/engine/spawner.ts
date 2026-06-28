@@ -1,5 +1,4 @@
 import type { CanvasSize, SpawnEvent, FruitType, LevelConfig } from '../types'
-import { CONFIG } from '../config'
 
 const FRUITS: FruitType[] = ['watermelon', 'apple', 'orange', 'lime', 'strawberry', 'pineapple', 'peach', 'kiwi']
 
@@ -11,9 +10,9 @@ const FRUITS: FruitType[] = ['watermelon', 'apple', 'orange', 'lime', 'strawberr
  */
 export function makeSpawn(rng: () => number, canvas: CanvasSize, level: LevelConfig): SpawnEvent {
   const roll = rng()
-  const goldenThreshold = level.bombChance + CONFIG.bonus.goldenHeartChance
-  const heartThreshold = goldenThreshold + CONFIG.bonus.heartChance
-  const slowMoThreshold = heartThreshold + CONFIG.slowMo.chance
+  const goldenThreshold = level.bombChance + level.goldenHeartChance
+  const heartThreshold = goldenThreshold + level.heartChance
+  const slowMoThreshold = heartThreshold + level.slowMoChance
 
   let type: SpawnEvent['type']
   let radius: number

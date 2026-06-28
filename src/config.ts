@@ -20,4 +20,15 @@ export const CONFIG = {
   particles: { maxCount: 400, perCut: 14 },
   audio: { masterVolume: 0.35 },
   highScoreKey: 'fruitFury.highScore',
+  highScoreZenKey: 'fruitFury.highScore.zen',
+  zen: {
+    level: 3,
+    bombChance: 0,
+    heartChance: 0,
+    goldenHeartChance: 0,
+    slowMoChance: 0.08,
+    spawnIntervalMs: 1200,
+    comboWindowMs: 400,
+    timerDurationMs: 90000,
+  },
 } as const

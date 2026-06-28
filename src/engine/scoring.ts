@@ -1,4 +1,5 @@
 import { CONFIG } from '../config'
+import type { GameMode } from '../types'
 import { getLevelConfig } from './levels'
 
 /** Mutable game state: score, lives, level progression, and rolling combo detection. */
@@ -10,6 +11,12 @@ export class GameState {
   level = 1
   fruitsSlicedThisLevel = 0
   slowMoUntil = 0
+  mode: GameMode = 'classic'
+
+  // Zen mode timer state
+  timerActive = false
+  timeRemaining = 0
+  timerRunning = false
 
   private comboCount = 0
   private comboLastT = -Infinity
@@ -18,10 +25,15 @@ export class GameState {
     return getLevelConfig(this.level)
   }
 
+  /** Get the combo window for the current mode. */
+  get comboWindowMs(): number {
+    return this.mode === 'zen' ? CONFIG.zen.comboWindowMs : CONFIG.combo.windowMs
+  }
+
   /** Register a fruit slice at time t (ms). Handles combo accrual + scoring. */
   sliceFruit(t: number): void {
     if (this.isOver) return
-    if (t - this.comboLastT <= CONFIG.combo.windowMs) {
+    if (t - this.comboLastT <= this.comboWindowMs) {
       this.comboCount += 1
     } else {
       this.comboCount = 1
@@ -36,17 +48,20 @@ export class GameState {
 
   sliceBomb(): void {
     if (this.isOver) return
+    if (this.mode === 'zen') return // no-op in zen
     this.loseLife()
   }
 
   missFruit(): void {
     if (this.isOver) return
+    if (this.mode === 'zen') return // no-op in zen
     this.loseLife()
   }
 
   /** Heal lives. Returns the actual number restored. */
   heal(amount: number): number {
     if (this.isOver) return 0
+    if (this.mode === 'zen') return 0 // no-op in zen
     const before = this.lives
     this.lives = Math.min(this.lives + amount, CONFIG.lives)
     return this.lives - before
@@ -54,6 +69,7 @@ export class GameState {
 
   /** Returns true if the player has sliced enough fruit to advance. */
   checkLevelUp(): boolean {
+    if (this.mode === 'zen') return false // no progression in zen
     if (this.fruitsSlicedThisLevel >= this.levelConfig.fruitsToAdvance) {
       this.level += 1
       this.fruitsSlicedThisLevel = 0

@@ -119,4 +119,52 @@ describe('GameState', () => {
       expect(g.isSlowMoActive(5000)).toBe(1)
     })
   })
+
+  describe('zen mode', () => {
+    it('missFruit is no-op', () => {
+      const g = new GameState()
+      g.mode = 'zen'
+      g.lives = 3
+      g.missFruit()
+      expect(g.lives).toBe(3)
+      expect(g.isOver).toBe(false)
+    })
+
+    it('sliceBomb is no-op', () => {
+      const g = new GameState()
+      g.mode = 'zen'
+      g.lives = 3
+      g.sliceBomb()
+      expect(g.lives).toBe(3)
+      expect(g.isOver).toBe(false)
+    })
+
+    it('heal is no-op', () => {
+      const g = new GameState()
+      g.mode = 'zen'
+      g.lives = 2
+      const restored = g.heal(1)
+      expect(restored).toBe(0)
+      expect(g.lives).toBe(2)
+    })
+
+    it('checkLevelUp always returns false', () => {
+      const g = new GameState()
+      g.mode = 'zen'
+      for (let i = 0; i < 100; i++) g.sliceFruit(i * 300)
+      expect(g.checkLevelUp()).toBe(false)
+      expect(g.level).toBe(1)
+    })
+
+    it('combo window is 400ms (wider than classic 220ms)', () => {
+      const g = new GameState()
+      g.mode = 'zen'
+      expect(g.comboWindowMs).toBe(400)
+    })
+
+    it('combo window is 220ms in classic mode', () => {
+      const g = new GameState()
+      expect(g.comboWindowMs).toBe(220)
+    })
+  })
 })

@@ -2,7 +2,7 @@ import type { Vec2 } from '../types'
 
 type Ctx = CanvasRenderingContext2D
 
-export type MenuIcon = 'play' | 'calibrate' | 'camera' | 'cameraOff' | 'sound' | 'soundOff' | 'restart' | 'pause' | 'quit'
+export type MenuIcon = 'play' | 'calibrate' | 'camera' | 'cameraOff' | 'sound' | 'soundOff' | 'restart' | 'pause' | 'quit' | 'zen'
 
 export interface MenuButton {
   id: string
@@ -190,6 +190,23 @@ export function drawIcon(ctx: Ctx, icon: MenuIcon, x: number, y: number, size: n
       ctx.lineTo(ax + size * 0.28, ay - size * 0.07)
       ctx.closePath()
       ctx.fill()
+      break
+    }
+    case 'zen': {
+      // Lotus-like icon: overlapping petals
+      ctx.lineWidth = size * 0.08
+      ctx.strokeStyle = '#87ceeb'
+      ctx.fillStyle = 'rgba(135,206,235,0.3)'
+      for (let i = 0; i < 8; i++) {
+        const a = (Math.PI * 2 * i) / 8 - Math.PI / 2
+        ctx.beginPath()
+        ctx.ellipse(x + Math.cos(a) * size * 0.15, y + Math.sin(a) * size * 0.15, size * 0.12, size * 0.22, a, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+      }
+      // Center circle
+      ctx.fillStyle = '#fff8e7'
+      ctx.beginPath(); ctx.arc(x, y, size * 0.08, 0, Math.PI * 2); ctx.fill()
       break
     }
     case 'calibrate': {

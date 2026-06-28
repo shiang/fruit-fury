@@ -7,6 +7,7 @@ export interface CanvasSize { width: number; height: number }
 export type FruitType = 'watermelon' | 'apple' | 'orange' | 'lime' | 'strawberry' | 'pineapple' | 'peach' | 'kiwi'
 export type BonusType = 'heart' | 'golden-heart'
 export type EntityType = FruitType | 'bomb' | BonusType | 'slow-mo'
+export type GameMode = 'classic' | 'zen'
 
 export interface Entity {
   id: number
@@ -36,6 +37,9 @@ export interface LevelConfig {
   fruitsToAdvance: number
   spawnIntervalMs: number
   bombChance: number
+  goldenHeartChance: number
+  heartChance: number
+  slowMoChance: number
   peakHeightMin: number
   peakHeightMax: number
   gravity: number

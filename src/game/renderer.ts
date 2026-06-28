@@ -41,6 +41,9 @@ export interface RenderInput {
   flash: number
   slowMoOverlay: number
   now: number
+  mode: 'classic' | 'zen'
+  timerActive: boolean
+  timeRemaining: number
 }
 
 export function render(input: RenderInput): void {
@@ -176,13 +179,31 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
   ctx.font = '20px sans-serif'
   ctx.fillText(`Best ${input.highScore}`, 24, 72)
 
-  ctx.textAlign = 'right'
-  ctx.font = 'bold 26px sans-serif'
-  ctx.fillStyle = '#ffd35e'
-  ctx.fillText(`Lv ${input.level}`, width - 24, 40)
-  ctx.font = '16px sans-serif'
-  ctx.fillStyle = '#fff8e7'
-  ctx.fillText(input.levelName, width - 24, 62)
+  // Zen mode: show timer instead of level
+  if (input.mode === 'zen') {
+    ctx.textAlign = 'right'
+    ctx.font = 'bold 26px sans-serif'
+    ctx.fillStyle = '#87ceeb'
+    ctx.fillText('ZEN', width - 24, 40)
+    
+    if (input.timerActive) {
+      const secs = Math.ceil(input.timeRemaining / 1000)
+      const mins = Math.floor(secs / 60)
+      const s = secs % 60
+      ctx.font = 'bold 20px sans-serif'
+      ctx.fillStyle = '#fff8e7'
+      ctx.fillText(`${mins}:${s.toString().padStart(2, '0')}`, width - 24, 68)
+    }
+  } else {
+    // Classic mode: show level
+    ctx.textAlign = 'right'
+    ctx.font = 'bold 26px sans-serif'
+    ctx.fillStyle = '#ffd35e'
+    ctx.fillText(`Lv ${input.level}`, width - 24, 40)
+    ctx.font = '16px sans-serif'
+    ctx.fillStyle = '#fff8e7'
+    ctx.fillText(input.levelName, width - 24, 62)
+  }
 
   // Combo multiplier display
   if (input.comboCount > 1) {
@@ -192,22 +213,26 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
     ctx.fillText(`x${input.comboCount}`, 24, 100)
   }
 
-  // Level progress bar
-  const barW = 160
-  const barX = width - 24 - barW
-  const barY = 70
-  ctx.fillStyle = 'rgba(255,255,255,0.2)'
-  ctx.fillRect(barX, barY, barW, 6)
-  const prog = input.fruitsToAdvance > 0 ? input.fruitsThisLevel / input.fruitsToAdvance : 0
-  ctx.fillStyle = '#7ac043'
-  ctx.fillRect(barX, barY, barW * Math.min(1, prog), 6)
+  // Level progress bar (only in classic mode)
+  if (input.mode === 'classic') {
+    const barW = 160
+    const barX = width - 24 - barW
+    const barY = 70
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'
+    ctx.fillRect(barX, barY, barW, 6)
+    const prog = input.fruitsToAdvance > 0 ? input.fruitsThisLevel / input.fruitsToAdvance : 0
+    ctx.fillStyle = '#7ac043'
+    ctx.fillRect(barX, barY, barW * Math.min(1, prog), 6)
+  }
 
-  // Hearts
-  ctx.font = '28px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#ff4d6d'
-  const hearts = '\u2764'.repeat(input.lives) + '\u00b7'.repeat(Math.max(0, input.maxLives - input.lives))
-  ctx.fillText(hearts, width / 2, 44)
+  // Hearts (only in classic mode)
+  if (input.mode === 'classic') {
+    ctx.font = '28px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#ff4d6d'
+    const hearts = '\u2764'.repeat(input.lives) + '\u00b7'.repeat(Math.max(0, input.maxLives - input.lives))
+    ctx.fillText(hearts, width / 2, 44)
+  }
   ctx.restore()
 }
 
