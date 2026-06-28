@@ -21,6 +21,16 @@ export const CONFIG = {
   audio: { masterVolume: 0.35 },
   highScoreKey: 'fruitFury.highScore',
   highScoreZenKey: 'fruitFury.highScore.zen',
+  highScoreTimeAttackKey: 'fruitFury.highScore.timeAttack',
+  timeAttack: {
+    durationMs: 60_000,
+    bombChance: 0,
+    heartChance: 0,
+    goldenHeartChance: 0,
+    slowMoChance: 0.08,
+    spawnIntervalMs: 1000,
+    comboWindowMs: 300,
+  },
   zen: {
     level: 99,
     bombChance: 0,

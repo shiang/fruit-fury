@@ -1,4 +1,5 @@
 import { CONFIG, CANVAS_SIZE } from '../config'
+import { TIME_ATTACK_LEVEL } from '../engine/levels'
 import type { Entity, TrailPoint, Vec2, GameMode } from '../types'
 import { mapToGame } from '../engine/mapping'
 import { BladeTracker } from '../engine/bladeTracker'
@@ -41,6 +42,8 @@ export class Game {
 
   private calibUntil = 0
   private countdownUntil = 0
+  private timeAttackStartedAt = 0
+  private timeAttackDurationMs = CONFIG.timeAttack.durationMs
 
   private comboText: string | null = null
   private comboTextUntil = 0
@@ -167,6 +170,10 @@ export class Game {
         this.resetGame('zen')
         this.beginCountdown()
         break
+      case 'time-attack':
+        this.resetGame('time-attack')
+        this.beginCountdown()
+        break
       case 'calibrate':
         this.beginCalibration()
         break
@@ -208,6 +215,8 @@ export class Game {
       y += bh + 14
       buttons.push(this.mkBtn('zen', 'Zen Mode', 'zen', cx, y, bw, bh, false, true))
       y += bh + 14
+      buttons.push(this.mkBtn('time-attack', 'Time Attack', 'restart', cx, y, bw, bh, false, true))
+      y += bh + 14
       buttons.push(this.mkBtn('calibrate', 'Calibrate', 'calibrate', cx, y, bw, bh, false, true))
       y += bh + 14
       buttons.push(this.mkBtn('howto', 'How to Play', 'howto', cx, y, bw, bh, false, true))
@@ -222,6 +231,10 @@ export class Game {
       if (this.gameMode === 'zen') {
         y += bh + 18
         buttons.push(this.mkBtn('zen', 'Zen Again', 'zen', cx, y, bw, bh, false, true))
+      }
+      if (this.gameMode === 'time-attack') {
+        y += bh + 18
+        buttons.push(this.mkBtn('time-attack', 'Time Attack Again', 'restart', cx, y, bw, bh, false, true))
       }
     } else if (this.screen === 'paused') {
       let y = height * 0.42
@@ -266,6 +279,9 @@ export class Game {
   private beginCountdown(): void {
     this.screen = 'countdown'
     this.countdownUntil = performance.now() + 3000
+    if (this.gameMode === 'time-attack') {
+      this.timeAttackStartedAt = performance.now() + 3000
+    }
   }
 
   private showTutorial(): void {
@@ -311,18 +327,30 @@ export class Game {
     this.state = new GameState()
     this.state.mode = mode
     this.gameMode = mode
-    this.highScore = Number(localStorage.getItem(mode === 'zen' ? CONFIG.highScoreZenKey : CONFIG.highScoreKey) ?? 0)
+    this.highScore = Number(localStorage.getItem(this.getHighScoreKey(mode)) ?? 0)
     this.spawnTimer = 0
     this.trackers.forEach((t) => t.reset())
     this.smoothedPos = [null, null]
     this.levelUpText = null
     this.menuBtnStates.clear()
     this.gameOverReason = null
+    this.timeAttackStartedAt = 0
     
     // Zen mode: use dedicated zen level (no bombs, no hearts)
     if (mode === 'zen') {
       this.state.level = CONFIG.zen.level
     }
+    // Time attack: use dedicated time attack level
+    if (mode === 'time-attack') {
+      this.state.level = TIME_ATTACK_LEVEL.level
+      this.timeAttackDurationMs = CONFIG.timeAttack.durationMs
+    }
+  }
+
+  private getHighScoreKey(mode: GameMode): string {
+    if (mode === 'zen') return CONFIG.highScoreZenKey
+    if (mode === 'time-attack') return CONFIG.highScoreTimeAttackKey
+    return CONFIG.highScoreKey
   }
 
   private loop = (): void => {
@@ -444,7 +472,17 @@ export class Game {
 
     this.advanceCosmetic(dt)
     this.checkLevelUp(now)
+    this.checkTimeAttackTimer(now)
     this.endGameIfOver()
+  }
+
+  private checkTimeAttackTimer(now: number): void {
+    if (this.gameMode !== 'time-attack' || this.timeAttackStartedAt === 0) return
+    const elapsed = now - this.timeAttackStartedAt
+    if (elapsed >= this.timeAttackDurationMs) {
+      this.state.isOver = true
+      this.gameOverReason = 'timeup'
+    }
   }
 
   private checkLevelUp(now: number): void {
@@ -460,7 +498,6 @@ export class Game {
 
   private endGameIfOver(): void {
     if (!this.state.isOver) return
-    this.gameOverReason = 'lives'
     this.saveHighScore()
     this.screen = 'gameover'
   }
@@ -468,8 +505,7 @@ export class Game {
   private saveHighScore(): void {
     if (this.state.score > this.highScore) {
       this.highScore = this.state.score
-      const key = this.gameMode === 'zen' ? CONFIG.highScoreZenKey : CONFIG.highScoreKey
-      localStorage.setItem(key, String(this.highScore))
+      localStorage.setItem(this.getHighScoreKey(this.gameMode), String(this.highScore))
     }
   }
 
@@ -560,6 +596,9 @@ export class Game {
     const lv = this.state.levelConfig
     const isMenu = this.screen === 'title' || this.screen === 'gameover' || this.screen === 'paused' || this.screen === 'tutorial'
     const showStandardCursor = !isMenu
+    const timeAttackElapsedMs = this.gameMode === 'time-attack' && this.timeAttackStartedAt > 0
+      ? Math.max(0, now - this.timeAttackStartedAt)
+      : undefined
     render({
       ctx: this.ctx, video: this.video, showFeed: this.showFeed, showHud: this.screen === 'playing' || this.screen === 'countdown', canvas: CANVAS_SIZE,
       entities: this.entities, halves: this.halves, particles: this.particles,
@@ -571,6 +610,8 @@ export class Game {
       comboCount: this.state.lastCombo, comboText: this.comboText, levelUpText: this.levelUpText,
       shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, now,
       mode: this.gameMode,
+      timeAttackElapsedMs,
+      timeAttackDurationMs: this.timeAttackDurationMs,
     })
     this.drawOverlay(now)
   }
@@ -593,6 +634,8 @@ export class Game {
       const left = Math.max(1, Math.ceil((this.countdownUntil - now) / 1000))
       if (this.gameMode === 'zen') {
         this.drawSimpleOverlay(ctx, width, height, ['ZEN MODE', 'No bombs, no lives, slice freely', `${left}...`])
+      } else if (this.gameMode === 'time-attack') {
+        this.drawSimpleOverlay(ctx, width, height, ['TIME ATTACK', '60 seconds. Slice everything.', `${left}...`])
       } else {
         this.drawSimpleOverlay(ctx, width, height, [`${left}`])
       }
@@ -669,6 +712,13 @@ export class Game {
       ctx.font = `bold ${titleSize}px sans-serif`
       ctx.fillStyle = '#87ceeb'
       ctx.fillText(reason, cx, titleY)
+    } else if (this.gameMode === 'time-attack') {
+      // Time attack: fiery orange
+      ctx.shadowColor = 'rgba(255,120,30,0.5)'
+      ctx.shadowBlur = 25
+      ctx.font = `bold ${titleSize}px sans-serif`
+      ctx.fillStyle = '#ff781e'
+      ctx.fillText("Time's Up!", cx, titleY)
     } else {
       // Classic mode: red
       ctx.shadowColor = 'rgba(200,30,40,0.5)'
@@ -686,7 +736,11 @@ export class Game {
     ctx.fillText(`Score  ${this.state.score}`, cx, statY)
     ctx.font = `${Math.round(height * 0.025)}px sans-serif`
     ctx.fillStyle = 'rgba(255,248,231,0.7)'
-    ctx.fillText(`Best  ${this.highScore}     Level  ${this.state.level}`, cx, statY + height * 0.045)
+    if (this.gameMode === 'time-attack') {
+      ctx.fillText(`Best  ${this.highScore}     Slices  ${this.state.fruitsSlicedThisLevel}`, cx, statY + height * 0.045)
+    } else {
+      ctx.fillText(`Best  ${this.highScore}     Level  ${this.state.level}`, cx, statY + height * 0.045)
+    }
 
     // Buttons
     for (const btn of this.menuButtons) drawButton(ctx, btn, now)

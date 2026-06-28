@@ -22,11 +22,20 @@ const ZEN_LEVEL: LevelConfig = {
   horizontalDrift: 200, fruitRadius: 58, bombRadius: 42,
 }
 
+// Time Attack: 60-second sprint, no bombs, no hearts, no lives. Fixed level 5 difficulty.
+export const TIME_ATTACK_LEVEL: LevelConfig = {
+  level: 98, name: 'Time Attack', fruitsToAdvance: 22, spawnIntervalMs: 1000,
+  bombChance: 0, goldenHeartChance: 0, heartChance: 0, slowMoChance: 0.08,
+  peakHeightMin: 0.24, peakHeightMax: 0.32, gravity: 1100, burstCount: 2,
+  horizontalDrift: 280, fruitRadius: 50, bombRadius: 40,
+}
+
 const PREDEFINED_COUNT = LEVELS.length
 
 /** Return the LevelConfig for a given 1-based level number. Scales procedurally past the predefined table. */
 export function getLevelConfig(level: number): LevelConfig {
   if (level === ZEN_LEVEL.level) return ZEN_LEVEL
+  if (level === TIME_ATTACK_LEVEL.level) return TIME_ATTACK_LEVEL
   if (level >= 1 && level <= PREDEFINED_COUNT) return LEVELS[level - 1]
 
   const base = LEVELS[PREDEFINED_COUNT - 1]

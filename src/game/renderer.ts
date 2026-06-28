@@ -41,7 +41,9 @@ export interface RenderInput {
   flash: number
   slowMoOverlay: number
   now: number
-  mode: 'classic' | 'zen'
+  mode: 'classic' | 'zen' | 'time-attack'
+  timeAttackElapsedMs?: number
+  timeAttackDurationMs?: number
 }
 
 export function render(input: RenderInput): void {
@@ -58,6 +60,9 @@ export function render(input: RenderInput): void {
   if (input.mode === 'zen') {
     bg.addColorStop(0, '#b8d4e3')
     bg.addColorStop(1, '#7ab8d4')
+  } else if (input.mode === 'time-attack') {
+    bg.addColorStop(0, '#4a2010')
+    bg.addColorStop(1, '#1a0800')
   } else {
     bg.addColorStop(0, '#5a4226')
     bg.addColorStop(1, '#2e2012')
@@ -182,9 +187,8 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
   ctx.font = '20px sans-serif'
   ctx.fillText(`Best ${input.highScore}`, 24, 72)
 
-  // Zen mode: show timer instead of level
+  // Zen mode: show pulsing ZEN badge
   if (input.mode === 'zen') {
-    // Pulsing ZEN badge
     const pulse = 1 + 0.05 * Math.sin(input.now * 0.004)
     ctx.textAlign = 'right'
     ctx.font = 'bold 26px sans-serif'
@@ -194,6 +198,20 @@ function drawHud(ctx: CanvasRenderingContext2D, input: RenderInput) {
     ctx.scale(pulse, pulse)
     ctx.fillText('ZEN', 0, 0)
     ctx.restore()
+  } else if (input.mode === 'time-attack') {
+    // Time attack: show countdown timer
+    const elapsed = input.timeAttackElapsedMs ?? 0
+    const duration = input.timeAttackDurationMs ?? 60000
+    const remaining = Math.max(0, duration - elapsed)
+    const seconds = Math.ceil(remaining / 1000)
+    const urgency = remaining < 10000 ? '#ff4d6d' : remaining < 30000 ? '#ff781e' : '#ffd35e'
+    ctx.textAlign = 'right'
+    ctx.font = 'bold 28px sans-serif'
+    ctx.fillStyle = urgency
+    ctx.fillText(`${seconds}s`, width - 24, 40)
+    ctx.font = '16px sans-serif'
+    ctx.fillStyle = '#fff8e7'
+    ctx.fillText('TIME ATTACK', width - 24, 62)
   } else {
     // Classic mode: show level
     ctx.textAlign = 'right'

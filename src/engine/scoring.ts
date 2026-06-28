@@ -22,7 +22,9 @@ export class GameState {
 
   /** Get the combo window for the current mode. */
   get comboWindowMs(): number {
-    return this.mode === 'zen' ? CONFIG.zen.comboWindowMs : CONFIG.combo.windowMs
+    if (this.mode === 'zen') return CONFIG.zen.comboWindowMs
+    if (this.mode === 'time-attack') return CONFIG.timeAttack.comboWindowMs
+    return CONFIG.combo.windowMs
   }
 
   /** Register a fruit slice at time t (ms). Handles combo accrual + scoring. */
@@ -43,20 +45,20 @@ export class GameState {
 
   sliceBomb(): void {
     if (this.isOver) return
-    if (this.mode === 'zen') return // no-op in zen
+    if (this.mode === 'zen' || this.mode === 'time-attack') return // no-op in zen/time-attack
     this.loseLife()
   }
 
   missFruit(): void {
     if (this.isOver) return
-    if (this.mode === 'zen') return // no-op in zen
+    if (this.mode === 'zen' || this.mode === 'time-attack') return // no-op in zen/time-attack
     this.loseLife()
   }
 
   /** Heal lives. Returns the actual number restored. */
   heal(amount: number): number {
     if (this.isOver) return 0
-    if (this.mode === 'zen') return 0 // no-op in zen
+    if (this.mode === 'zen' || this.mode === 'time-attack') return 0 // no-op in zen/time-attack
     const before = this.lives
     this.lives = Math.min(this.lives + amount, CONFIG.lives)
     return this.lives - before
@@ -64,7 +66,7 @@ export class GameState {
 
   /** Returns true if the player has sliced enough fruit to advance. */
   checkLevelUp(): boolean {
-    if (this.mode === 'zen') return false // no progression in zen
+    if (this.mode === 'zen' || this.mode === 'time-attack') return false // no progression in zen/time-attack
     if (this.fruitsSlicedThisLevel >= this.levelConfig.fruitsToAdvance) {
       this.level += 1
       this.fruitsSlicedThisLevel = 0
