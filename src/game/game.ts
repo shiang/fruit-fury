@@ -147,7 +147,7 @@ export class Game {
         this.beginCountdown()
         break
       case 'zen':
-        if (this.screen === 'gameover') this.resetGame('zen')
+        this.resetGame('zen')
         this.beginCountdown()
         break
       case 'calibrate':
