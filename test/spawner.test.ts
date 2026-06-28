@@ -39,6 +39,22 @@ describe('getLevelConfig', () => {
     expect(l20.fruitRadius).toBeGreaterThanOrEqual(28)
     expect(l20.peakHeightMax).toBeLessThanOrEqual(0.5)
   })
+
+  it('returns zen level 99 without procedural scaling', () => {
+    const zen = getLevelConfig(99)
+    expect(zen.name).toBe('Zen Garden')
+    expect(zen.bombChance).toBe(0)
+    expect(zen.goldenHeartChance).toBe(0)
+    expect(zen.heartChance).toBe(0)
+    expect(zen.slowMoChance).toBe(0.08)
+    expect(zen.spawnIntervalMs).toBe(1200)
+    expect(zen.peakHeightMin).toBe(0.16)
+    expect(zen.peakHeightMax).toBe(0.24)
+    expect(zen.gravity).toBe(1050)
+    expect(zen.burstCount).toBe(2)
+    expect(zen.horizontalDrift).toBe(200)
+    expect(zen.fruitRadius).toBe(58)
+  })
 })
 
 describe('makeSpawn', () => {
