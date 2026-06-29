@@ -9,6 +9,8 @@ import { makeSpawn } from '../engine/spawner'
 import { GameState } from '../engine/scoring'
 import { render, fruitColor, type Half, type Particle } from './renderer'
 import { AudioEngine } from './audio'
+import { EventScheduler } from '../engine/events'
+import type { EventWorld } from '../engine/events/types'
 import { hitTestButtons, pointInButton, drawButton, drawMenuCursor, type MenuButton, type MenuIcon } from './menu'
 import { MouseSource } from './camera'
 import type { HandSource, HandSample } from './camera'
@@ -68,6 +70,7 @@ export class Game {
   private static readonly MENU_HOLD_S = 0.6
   private tutorialState = createTutorialState()
   private tutorialPinchLatch = false
+  private eventScheduler: EventScheduler | null = null
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -347,6 +350,13 @@ export class Game {
       this.state.level = TIME_ATTACK_LEVEL.level
       this.timeAttackDurationMs = CONFIG.timeAttack.durationMs
     }
+
+    // Initialize event scheduler (shared across all modes)
+    // Classic mode: disable Fruit Storm (too hard with 5 lives)
+    const eventConfig = mode === 'classic'
+      ? { ...CONFIG.events, fruitStorm: { ...CONFIG.events.fruitStorm, enabled: false } }
+      : CONFIG.events
+    this.eventScheduler = new EventScheduler(this.buildEventWorld(), eventConfig, performance.now())
   }
 
   private getHighScoreKey(mode: GameMode): string {
@@ -488,6 +498,8 @@ export class Game {
     this.advanceCosmetic(dt)
     this.checkLevelUp(now)
     this.checkTimeAttackTimer(now)
+    this.state.isGoldenHourActive(now)
+    this.eventScheduler?.update(now, dt)
     this.endGameIfOver()
   }
 
@@ -654,6 +666,9 @@ export class Game {
     const { width, height } = CANVAS_SIZE
     const cx = width / 2
 
+    // Draw event visuals on top of everything
+    this.eventScheduler?.draw(ctx, now)
+
     if (this.screen === 'title') {
       this.drawTitleScreen(ctx, cx, width, height, now)
     } else if (this.screen === 'gameover') {
@@ -812,6 +827,48 @@ export class Game {
     ctx.fillText(usingCamera ? 'Hover + pinch to select  |  ESC to resume' : 'Click to select  |  ESC to resume', cx, height * 0.93)
 
     ctx.restore()
+  }
+
+  private buildEventWorld(): EventWorld {
+    const game = this
+    return {
+      get entities() { return game.entities },
+      rng: this.rng,
+      canvas: CANVAS_SIZE,
+      spawnParticles: (pos, color, count) => this.spawnParticles(pos, color, count),
+      get shake() { return game.shake },
+      setShake: (v: number) => { game.shake = v; },
+      get flash() { return game.flash },
+      setFlash: (v: number) => { game.flash = v; },
+      setComboText: (text, until) => {
+        this.comboText = text
+        this.comboTextUntil = until
+      },
+      playSfx: (name) => this.audio.play(name as never),
+      processSlice: (entity, now) => this.processSlice(entity, now),
+      nextId: () => this.nextId++,
+      fruitType: () => {
+        const types = ['watermelon', 'apple', 'orange', 'lime', 'strawberry', 'pineapple', 'peach', 'kiwi'] as const
+        return types[Math.floor(this.rng() * types.length)]
+      },
+      fruitRadius: () => {
+        const base = 25 + this.state.level * 2
+        return base + (this.rng() - 0.5) * 10
+      },
+      fruitRadiusFixed: () => this.state.levelConfig.fruitRadius,
+      activateGoldenHour: (now: number) => this.state.activateGoldenHour(now),
+    }
+  }
+
+  private processSlice(entity: Entity, now: number): void {
+    if (entity.sliced) return
+    entity.sliced = true
+    if (entity.type === 'bomb') this.onBomb(entity)
+    else if (entity.type === 'heart' || entity.type === 'golden-heart') this.onBonus(entity, now)
+    else if (entity.type === 'slow-mo') this.onSlowMo(entity, now)
+    else if (entity.type === 'shrink-ray') this.onShrinkRay(entity, now)
+    else if (entity.type === 'freeze') this.onFreeze(entity, now)
+    else this.onSlice(entity, now)
   }
 
   private drawSimpleOverlay(ctx: CanvasRenderingContext2D, width: number, height: number, lines: string[]): void {

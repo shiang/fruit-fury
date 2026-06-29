@@ -33,6 +33,29 @@ export const CONFIG = {
     spawnIntervalMs: 1000,
     comboWindowMs: 300,
   },
+  events: {
+    fruitStorm: {
+      minIntervalMs: 90000,
+      maxIntervalMs: 180000,
+      durationMs: 2000,
+      spawnIntervalMs: 400,
+      spawnCount: 2,
+      enabled: true,
+    },
+    lightningStrike: {
+      minIntervalMs: 60000,
+      maxIntervalMs: 150000,
+      chainRadius: 130,
+      chainDelayMs: 200,
+      boltDurationMs: 600,
+      maxChainDepth: 4,
+    },
+    goldenHour: {
+      intervalMs: 30000,
+      durationMs: 5000,
+      pointsMultiplier: 3,
+    },
+  },
   zen: {
     level: 99,
     bombChance: 0,

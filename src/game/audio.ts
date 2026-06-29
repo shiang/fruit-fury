@@ -1,6 +1,9 @@
 import { CONFIG } from '../config'
 
-type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal' | 'slowmo' | 'shrink' | 'freeze' | 'timewarn' | 'timeend'
+type SfxName =
+  | 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal'
+  | 'slowmo' | 'shrink' | 'freeze' | 'timewarn' | 'timeend'
+  | 'storm' | 'lightning' | 'goldenStart' | 'goldenEnd'
 
 /** Procedural sound effects via Web Audio API — no audio files needed. */
 export class AudioEngine {
@@ -47,6 +50,10 @@ export class AudioEngine {
       case 'freeze': this.freeze(); break
       case 'timewarn': this.timeWarn(); break
       case 'timeend': this.timeEnd(); break
+      case 'storm': this.storm(); break
+      case 'lightning': this.lightning(); break
+      case 'goldenStart': this.goldenStart(); break
+      case 'goldenEnd': this.goldenEnd(); break
     }
   }
 
@@ -195,5 +202,70 @@ export class AudioEngine {
     // Soft bell: two tones, descending
     this.tone(660, 0.3, 'sine', 0.25, 440)
     this.tone(440, 0.4, 'sine', 0.2, 220, 0.2)
+  }
+
+  private storm(): void {
+    const ctx = this.ctx!
+    const t0 = ctx.currentTime
+    // Rain: multiple quick noise bursts
+    for (let i = 0; i < 6; i++) {
+      const src = ctx.createBufferSource()
+      src.buffer = this.noiseBuffer
+      const filt = ctx.createBiquadFilter()
+      filt.type = 'bandpass'
+      filt.frequency.setValueAtTime(800 + i * 200, t0 + i * 0.08)
+      filt.Q.value = 1.5
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(0.12, t0 + i * 0.08)
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.08 + 0.1)
+      src.connect(filt).connect(g).connect(this.master!)
+      src.start(t0 + i * 0.08)
+      src.stop(t0 + i * 0.08 + 0.1)
+    }
+    // Sustained whoosh
+    const osc = ctx.createOscillator()
+    const g = ctx.createGain()
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(100, t0)
+    osc.frequency.exponentialRampToValueAtTime(50, t0 + 0.5)
+    g.gain.setValueAtTime(0.08, t0)
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6)
+    osc.connect(g).connect(this.master!)
+    osc.start(t0)
+    osc.stop(t0 + 0.6)
+  }
+
+  private lightning(): void {
+    const ctx = this.ctx!
+    const t0 = ctx.currentTime
+    // Crack: sharp noise burst
+    const src = ctx.createBufferSource()
+    src.buffer = this.noiseBuffer
+    const filt = ctx.createBiquadFilter()
+    filt.type = 'highpass'
+    filt.frequency.setValueAtTime(2000, t0)
+    filt.frequency.exponentialRampToValueAtTime(500, t0 + 0.2)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.5, t0)
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.3)
+    src.connect(filt).connect(g).connect(this.master!)
+    src.start(t0)
+    src.stop(t0 + 0.3)
+    // Low boom
+    this.tone(60, 0.5, 'sine', 0.4, 20)
+  }
+
+  private goldenStart(): void {
+    // Magical shimmer: ascending arpeggio
+    const notes = [523, 659, 784, 1047, 1319]
+    notes.forEach((f, i) => this.tone(f, 0.15, 'sine', 0.12, undefined, i * 0.06))
+    // Sparkle
+    this.tone(2000, 0.2, 'sine', 0.05, 2400, 0.3)
+  }
+
+  private goldenEnd(): void {
+    // Gentle chime: two descending tones
+    this.tone(880, 0.25, 'sine', 0.2, 660)
+    this.tone(660, 0.3, 'sine', 0.18, 440, 0.15)
   }
 }

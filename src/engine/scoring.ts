@@ -18,6 +18,10 @@ export class GameState {
   private comboCount = 0
   private comboLastT = -Infinity
 
+  // Golden hour state
+  public goldenMultiplier = 1
+  public goldenHourUntil = 0
+
   get levelConfig() {
     return getLevelConfig(this.level)
   }
@@ -41,7 +45,8 @@ export class GameState {
     this.lastCombo = this.comboCount
 
     // Combo chain multiplier: each slice in a combo is worth comboCount x base points
-    this.score += CONFIG.points.fruit * this.comboCount
+    // Golden hour multiplier stacks on top (default 1, 3 during golden hour)
+    this.score += CONFIG.points.fruit * this.comboCount * this.goldenMultiplier
     this.fruitsSlicedThisLevel += 1
   }
 
@@ -108,6 +113,21 @@ export class GameState {
   /** Activate shrink for the configured duration. */
   activateShrink(now: number): void {
     this.shrinkUntil = now + CONFIG.shrinkRay.durationMs
+  }
+
+  /** Activate golden hour for the configured duration. Sets 3x points multiplier. */
+  activateGoldenHour(now: number): void {
+    this.goldenHourUntil = now + CONFIG.events.goldenHour.durationMs
+    this.goldenMultiplier = CONFIG.events.goldenHour.pointsMultiplier
+  }
+
+  /** Returns true if golden hour is currently active. */
+  isGoldenHourActive(now: number): boolean {
+    if (now >= this.goldenHourUntil) {
+      this.goldenMultiplier = 1
+      return false
+    }
+    return true
   }
 
   private loseLife(): void {
