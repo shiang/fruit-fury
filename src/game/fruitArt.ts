@@ -249,7 +249,79 @@ export function drawEntity(ctx: Ctx, type: EntityType, radius: number): void {
   if (type === 'bomb') drawBomb(ctx, radius)
   else if (type === 'heart' || type === 'golden-heart') drawBonus(ctx, type, radius)
   else if (type === 'slow-mo') drawSlowMoFruit(ctx, radius)
+  else if (type === 'shrink-ray') drawShrinkRayFruit(ctx, radius)
+  else if (type === 'freeze') drawFreezeFruit(ctx, radius)
   else drawFruit(ctx, type, radius)
+}
+
+export function drawShrinkRayFruit(ctx: Ctx, r: number): void {
+  // Outer glow - purple/pink
+  const glow = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r * 1.5)
+  glow.addColorStop(0, 'rgba(217,70,239,0.4)')
+  glow.addColorStop(1, 'rgba(217,70,239,0)')
+  ctx.fillStyle = glow
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2); ctx.fill()
+
+  // Body - magenta gradient
+  const grad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, 0, 0, 0, r)
+  grad.addColorStop(0, '#f0abfc')
+  grad.addColorStop(0.7, '#d946ef')
+  grad.addColorStop(1, '#86198f')
+  ctx.fillStyle = grad
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
+
+  // Laser energy lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+  ctx.lineWidth = 2
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath()
+    ctx.moveTo(-r * 0.5, i * r * 0.35)
+    ctx.lineTo(r * 0.5, i * r * 0.35)
+    ctx.stroke()
+  }
+
+  // Eye/scope center
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2)
+  ctx.fillStyle = '#fff'
+  ctx.fill()
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.15, 0, Math.PI * 2)
+  ctx.fillStyle = '#ef4444'
+  ctx.fill()
+}
+
+export function drawFreezeFruit(ctx: Ctx, r: number): void {
+  // Outer glow - ice blue
+  const glow = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r * 1.5)
+  glow.addColorStop(0, 'rgba(56,189,248,0.4)')
+  glow.addColorStop(1, 'rgba(56,189,248,0)')
+  ctx.fillStyle = glow
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2); ctx.fill()
+
+  // Body - ice blue gradient
+  const grad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, 0, 0, 0, r)
+  grad.addColorStop(0, '#bae6fd')
+  grad.addColorStop(0.7, '#38bdf8')
+  grad.addColorStop(1, '#0369a1')
+  ctx.fillStyle = grad
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill()
+
+  // Ice crystal facets
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+  ctx.lineWidth = 2
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + performance.now() * 0.001
+    const x = Math.cos(a) * r * 0.6
+    const y = Math.sin(a) * r * 0.6
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9)
+    ctx.stroke()
+  }
+
+  // Center snowflake dot
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  ctx.fill()
 }
 
 function drawSlowMoFruit(ctx: Ctx, r: number): void {

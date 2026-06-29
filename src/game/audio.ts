@@ -1,6 +1,6 @@
 import { CONFIG } from '../config'
 
-type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal' | 'slowmo' | 'timewarn' | 'timeend'
+type SfxName = 'slice' | 'bomb' | 'combo' | 'miss' | 'levelup' | 'menuclick' | 'heal' | 'slowmo' | 'shrink' | 'freeze' | 'timewarn' | 'timeend'
 
 /** Procedural sound effects via Web Audio API — no audio files needed. */
 export class AudioEngine {
@@ -43,6 +43,8 @@ export class AudioEngine {
       case 'menuclick': this.menuClick(); break
       case 'heal': this.heal(); break
       case 'slowmo': this.slowMo(); break
+      case 'shrink': this.shrink(); break
+      case 'freeze': this.freeze(); break
       case 'timewarn': this.timeWarn(); break
       case 'timeend': this.timeEnd(); break
     }
@@ -144,6 +146,43 @@ export class AudioEngine {
     osc.stop(t0 + 0.6)
     // Second harmonic for sparkle
     this.tone(1800, 0.3, 'sine', 0.08, 2600, 0.05)
+  }
+
+  private shrink(): void {
+    const ctx = this.ctx!
+    const t0 = ctx.currentTime
+    // Descending tone: high to low (shrinking effect)
+    const osc = ctx.createOscillator()
+    const g = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(1200, t0)
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, 200), t0 + 0.4)
+    g.gain.setValueAtTime(0.2, t0)
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5)
+    osc.connect(g).connect(this.master!)
+    osc.start(t0)
+    osc.stop(t0 + 0.5)
+    // Subtle sparkle
+    this.tone(2400, 0.15, 'sine', 0.06, 1800, 0.05)
+  }
+
+  private freeze(): void {
+    const ctx = this.ctx!
+    const t0 = ctx.currentTime
+    // Icy shimmer: high sine sweep up + crystalline tail
+    const osc = ctx.createOscillator()
+    const g = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(1600, t0)
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, 3200), t0 + 0.15)
+    g.gain.setValueAtTime(0.18, t0)
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5)
+    osc.connect(g).connect(this.master!)
+    osc.start(t0)
+    osc.stop(t0 + 0.5)
+    // Crystalline harmonics
+    this.tone(3200, 0.2, 'sine', 0.05, 4000, 0.03)
+    this.tone(2800, 0.25, 'sine', 0.04, 3600, 0.06)
   }
 
   private timeWarn(): void {

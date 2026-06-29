@@ -17,6 +17,8 @@ export const CONFIG = {
   points: { fruit: 10 },
   bonus: { heartHeal: 1, goldenHeartHeal: 5, heartChance: 0.025, goldenHeartChance: 0.008 },
   slowMo: { durationMs: 3000, chance: 0.04 },
+  shrinkRay: { durationMs: 4000, chance: 0.03 },
+  freeze: { durationMs: 2000, chance: 0.03 },
   particles: { maxCount: 400, perCut: 14 },
   audio: { masterVolume: 0.35 },
   highScoreKey: 'fruitFury.highScore',

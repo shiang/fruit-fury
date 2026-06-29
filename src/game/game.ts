@@ -52,6 +52,8 @@ export class Game {
   private shake = 0
   private flash = 0
   private slowMoOverlay = 0
+  private freezeOverlay = 0
+  private shrinkOverlay = 0
   private gameOverReason: 'lives' | 'timeup' | null = null
 
   private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
@@ -394,6 +396,8 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 3)
     this.flash = Math.max(0, this.flash - dt * 4)
     this.slowMoOverlay = Math.max(0, this.slowMoOverlay - dt * 1.5)
+    this.freezeOverlay = Math.max(0, this.freezeOverlay - dt * 1.2)
+    this.shrinkOverlay = Math.max(0, this.shrinkOverlay - dt * 1.2)
     if (this.comboText && now > this.comboTextUntil) this.comboText = null
     if (this.levelUpText && now > this.levelUpTextUntil) this.levelUpText = null
 
@@ -441,10 +445,17 @@ export class Game {
 
     // integrate + cull misses
     const timeScale = this.state.isSlowMoActive(now)
+    const frozen = this.state.isFrozen(now)
+    const shrinking = this.state.isShrinking(now)
     const survivors: Entity[] = []
     for (const e of this.entities) {
-      const moved = integrate(e, dt * timeScale, lv.gravity)
-      if (moved.pos.y - moved.radius > CANVAS_SIZE.height && moved.vel.y > 0) {
+      const moved = integrate(e, dt * timeScale, lv.gravity, frozen)
+      // Apply shrink effect to bomb radii
+      let effectiveRadius = e.radius
+      if (shrinking && e.type === 'bomb') {
+        effectiveRadius = e.radius * 0.5
+      }
+      if (moved.pos.y - effectiveRadius > CANVAS_SIZE.height && moved.vel.y > 0) {
         if (moved.type !== 'bomb' && moved.type !== 'heart' && moved.type !== 'golden-heart') {
           this.state.missFruit()
           if (this.gameMode !== 'zen') this.audio.play('miss')
@@ -464,6 +475,8 @@ export class Game {
           if (e.type === 'bomb') this.onBomb(e)
           else if (e.type === 'heart' || e.type === 'golden-heart') this.onBonus(e, now)
           else if (e.type === 'slow-mo') this.onSlowMo(e, now)
+          else if (e.type === 'shrink-ray') this.onShrinkRay(e, now)
+          else if (e.type === 'freeze') this.onFreeze(e, now)
           else this.onSlice(e, now)
         }
       }
@@ -551,6 +564,24 @@ export class Game {
     this.audio.play('slowmo')
   }
 
+  private onShrinkRay(e: Entity, now: number): void {
+    this.state.activateShrink(now)
+    this.spawnParticles(e.pos, '#d946ef', 24)
+    this.shrinkOverlay = 1
+    this.comboText = 'Shrink Ray!'
+    this.comboTextUntil = now + 1200
+    this.audio.play('shrink')
+  }
+
+  private onFreeze(e: Entity, now: number): void {
+    this.state.activateFreeze(now)
+    this.spawnParticles(e.pos, '#38bdf8', 24)
+    this.freezeOverlay = 1
+    this.comboText = 'Frozen!'
+    this.comboTextUntil = now + 1200
+    this.audio.play('freeze')
+  }
+
   private spawnHalves(e: Entity): void {
     for (const side of [-1, 1] as const) {
       this.halves.push({
@@ -608,7 +639,7 @@ export class Game {
       level: this.state.level, levelName: lv.name,
       fruitsThisLevel: this.state.fruitsSlicedThisLevel, fruitsToAdvance: lv.fruitsToAdvance,
       comboCount: this.state.lastCombo, comboText: this.comboText, levelUpText: this.levelUpText,
-      shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, now,
+      shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, freezeOverlay: this.freezeOverlay, shrinkOverlay: this.shrinkOverlay, now,
       mode: this.gameMode,
       timeAttackElapsedMs,
       timeAttackDurationMs: this.timeAttackDurationMs,

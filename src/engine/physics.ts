@@ -1,7 +1,10 @@
 import type { Entity } from '../types'
 
 /** Pure projectile step: returns a new Entity advanced by dt (seconds) under gravity. */
-export function integrate(e: Entity, dt: number, gravity: number): Entity {
+export function integrate(e: Entity, dt: number, gravity: number, frozen: boolean = false): Entity {
+  if (frozen) {
+    return e
+  }
   const vy = e.vel.y + gravity * dt
   return {
     ...e,

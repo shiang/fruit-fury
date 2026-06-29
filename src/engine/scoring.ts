@@ -11,6 +11,8 @@ export class GameState {
   level = 1
   fruitsSlicedThisLevel = 0
   slowMoUntil = 0
+  freezeUntil = 0
+  shrinkUntil = 0
   mode: GameMode = 'classic'
 
   private comboCount = 0
@@ -86,6 +88,26 @@ export class GameState {
   /** Activate slow-motion for the configured duration. */
   activateSlowMo(now: number): void {
     this.slowMoUntil = now + CONFIG.slowMo.durationMs
+  }
+
+  /** Check if freeze is currently active. */
+  isFrozen(now: number): boolean {
+    return now < this.freezeUntil
+  }
+
+  /** Activate freeze for the configured duration. */
+  activateFreeze(now: number): void {
+    this.freezeUntil = now + CONFIG.freeze.durationMs
+  }
+
+  /** Check if shrink is currently active. */
+  isShrinking(now: number): boolean {
+    return now < this.shrinkUntil
+  }
+
+  /** Activate shrink for the configured duration. */
+  activateShrink(now: number): void {
+    this.shrinkUntil = now + CONFIG.shrinkRay.durationMs
   }
 
   private loseLife(): void {

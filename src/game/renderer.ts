@@ -40,6 +40,8 @@ export interface RenderInput {
   shake: number
   flash: number
   slowMoOverlay: number
+  freezeOverlay: number
+  shrinkOverlay: number
   now: number
   mode: 'classic' | 'zen' | 'time-attack'
   timeAttackElapsedMs?: number
@@ -121,6 +123,14 @@ export function render(input: RenderInput): void {
 
   if (input.slowMoOverlay > 0) {
     ctx.fillStyle = `rgba(100,180,255,${input.slowMoOverlay * 0.12})`
+    ctx.fillRect(-40, -40, width + 80, height + 80)
+  }
+  if (input.freezeOverlay > 0) {
+    ctx.fillStyle = `rgba(200,230,255,${input.freezeOverlay * 0.15})`
+    ctx.fillRect(-40, -40, width + 80, height + 80)
+  }
+  if (input.shrinkOverlay > 0) {
+    ctx.fillStyle = `rgba(217,70,239,${input.shrinkOverlay * 0.12})`
     ctx.fillRect(-40, -40, width + 80, height + 80)
   }
   ctx.restore()
