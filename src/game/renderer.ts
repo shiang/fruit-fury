@@ -135,6 +135,14 @@ export function render(input: RenderInput): void {
     ctx.fillStyle = `rgba(217,70,239,${input.shrinkOverlay * 0.12})`
     ctx.fillRect(-40, -40, width + 80, height + 80)
   }
+  if (input.furyOverlay > 0) {
+    ctx.fillStyle = `rgba(255,80,0,${input.furyOverlay * 0.18})`
+    ctx.fillRect(-40, -40, width + 80, height + 80)
+  }
+  if (input.rainbowOverlay > 0) {
+    ctx.fillStyle = `rgba(255,0,128,${input.rainbowOverlay * 0.12})`
+    ctx.fillRect(-40, -40, width + 80, height + 80)
+  }
   ctx.restore()
 }
 

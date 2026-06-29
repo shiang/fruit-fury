@@ -445,10 +445,12 @@ export class Game {
     // PLAYING
     const { segments } = this.updateBlades(now)
     const lv = this.state.levelConfig
+    const furyActive = this.state.isFuryModeActive(now)
+    if (furyActive) this.furyOverlay = Math.max(this.furyOverlay, 0.45)
 
     // spawn
     this.spawnTimer -= dt * 1000
-    const spawnInterval = this.state.isFuryMode ? lv.spawnIntervalMs / CONFIG.furyMode.spawnMultiplier : lv.spawnIntervalMs
+    const spawnInterval = furyActive ? lv.spawnIntervalMs / CONFIG.furyMode.spawnMultiplier : lv.spawnIntervalMs
     if (this.spawnTimer <= 0) {
       for (let b = 0; b < lv.burstCount; b++) {
         const ev = makeSpawn(this.rng, CANVAS_SIZE, lv)

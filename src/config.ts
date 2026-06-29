@@ -35,7 +35,6 @@ export const CONFIG = {
   },
   furyMode: {
     streakThreshold: 10,
-    streakResetWindowMs: 2500,
     durationMs: 8000,
     spawnMultiplier: 2,
     pointsMultiplier: 2,

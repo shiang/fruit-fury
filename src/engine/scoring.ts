@@ -24,7 +24,6 @@ export class GameState {
 
   // Perfect slice streak state
   public perfectStreak = 0
-  public perfectStreakUntil = 0
   public isFuryMode = false
   public furyModeUntil = 0
 
@@ -54,13 +53,8 @@ export class GameState {
     this.comboLastT = t
     this.lastCombo = this.comboCount
 
-    // Perfect slice streak tracking
-    if (t - this.perfectStreakUntil <= CONFIG.furyMode.streakResetWindowMs) {
-      this.perfectStreak += 1
-    } else {
-      this.perfectStreak = 1
-    }
-    this.perfectStreakUntil = t
+    // Perfect slice streak tracking: consecutive fruit slices since the last missed fruit.
+    this.perfectStreak += 1
 
     // Rainbow combo tracking
     if (fruitType && t - this.rainbowComboUntil <= CONFIG.rainbowCombo.resetWindowMs) {
@@ -84,12 +78,12 @@ export class GameState {
   /** Called when a fruit is missed — resets streak and rainbow combo. */
   resetStreak(): void {
     this.perfectStreak = 0
-    this.perfectStreakUntil = 0
     this.rainbowTypesThisCombo.clear()
   }
 
   sliceBomb(): void {
     if (this.isOver) return
+    this.resetStreak()
     if (this.mode === 'zen' || this.mode === 'time-attack') return // no-op in zen/time-attack
     this.loseLife()
   }
@@ -182,6 +176,7 @@ export class GameState {
   activateFuryMode(now: number): void {
     this.isFuryMode = true
     this.furyModeUntil = now + CONFIG.furyMode.durationMs
+    this.perfectStreak = 0
   }
 
   /** Returns true if rainbow combo bonus is currently active. */
