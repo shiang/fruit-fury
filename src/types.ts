@@ -15,6 +15,7 @@ export interface Entity {
   pos: Vec2
   vel: Vec2
   radius: number
+  baseRadius: number
   rotation: number
   angularVel: number
   sliced: boolean

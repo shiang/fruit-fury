@@ -4,7 +4,7 @@ import type { Entity } from '../src/types'
 
 const ent = (over: Partial<Entity> = {}): Entity => ({
   id: 1, type: 'apple', pos: { x: 0, y: 0 }, vel: { x: 100, y: -200 },
-  radius: 40, rotation: 0, angularVel: 2, sliced: false, ...over,
+  radius: 40, baseRadius: 40, rotation: 0, angularVel: 2, sliced: false, ...over,
 })
 
 describe('integrate', () => {

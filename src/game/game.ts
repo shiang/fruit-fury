@@ -437,7 +437,8 @@ export class Game {
         const ev = makeSpawn(this.rng, CANVAS_SIZE, lv)
         this.entities.push({
           id: this.nextId++, type: ev.type, pos: ev.pos, vel: ev.vel,
-          radius: ev.radius, rotation: 0, angularVel: (this.rng() - 0.5) * 6, sliced: false,
+          radius: ev.radius, baseRadius: ev.radius,
+          rotation: 0, angularVel: (this.rng() - 0.5) * 6, sliced: false,
         })
       }
       this.spawnTimer = lv.spawnIntervalMs
@@ -449,13 +450,14 @@ export class Game {
     const shrinking = this.state.isShrinking(now)
     const survivors: Entity[] = []
     for (const e of this.entities) {
-      const moved = integrate(e, dt * timeScale, lv.gravity, frozen)
       // Apply shrink effect to bomb radii
-      let effectiveRadius = e.radius
       if (shrinking && e.type === 'bomb') {
-        effectiveRadius = e.radius * 0.5
+        e.radius = e.baseRadius * 0.5
+      } else {
+        e.radius = e.baseRadius
       }
-      if (moved.pos.y - effectiveRadius > CANVAS_SIZE.height && moved.vel.y > 0) {
+      const moved = integrate(e, dt * timeScale, lv.gravity, frozen)
+      if (moved.pos.y - moved.radius > CANVAS_SIZE.height && moved.vel.y > 0) {
         if (moved.type !== 'bomb' && moved.type !== 'heart' && moved.type !== 'golden-heart') {
           this.state.missFruit()
           if (this.gameMode !== 'zen') this.audio.play('miss')
