@@ -33,10 +33,23 @@ export const CONFIG = {
     spawnIntervalMs: 1000,
     comboWindowMs: 300,
   },
+  furyMode: {
+    streakThreshold: 10,
+    streakResetWindowMs: 2500,
+    durationMs: 8000,
+    spawnMultiplier: 2,
+    pointsMultiplier: 2,
+  },
+  rainbowCombo: {
+    requiredTypes: 8,
+    resetWindowMs: 2200,
+    bonusPoints: 500,
+    durationMs: 2000,
+  },
   events: {
     fruitStorm: {
-      minIntervalMs: 90000,
-      maxIntervalMs: 180000,
+      minIntervalMs: 60000,
+      maxIntervalMs: 90000,
       durationMs: 2000,
       spawnIntervalMs: 400,
       spawnCount: 2,

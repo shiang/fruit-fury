@@ -56,6 +56,8 @@ export class Game {
   private slowMoOverlay = 0
   private freezeOverlay = 0
   private shrinkOverlay = 0
+  private furyOverlay = 0
+  private rainbowOverlay = 0
   private gameOverReason: 'lives' | 'timeup' | null = null
 
   private latestSample: HandSample = { hands: [], handedness: [], pinching: [], t: performance.now() }
@@ -340,6 +342,8 @@ export class Game {
     this.menuBtnStates.clear()
     this.gameOverReason = null
     this.timeAttackStartedAt = 0
+    this.furyOverlay = 0
+    this.rainbowOverlay = 0
     
     // Zen mode: use dedicated zen level (no bombs, no hearts)
     if (mode === 'zen') {
@@ -408,6 +412,8 @@ export class Game {
     this.slowMoOverlay = Math.max(0, this.slowMoOverlay - dt * 1.5)
     this.freezeOverlay = Math.max(0, this.freezeOverlay - dt * 1.2)
     this.shrinkOverlay = Math.max(0, this.shrinkOverlay - dt * 1.2)
+    this.furyOverlay = Math.max(0, this.furyOverlay - dt * 0.8)
+    this.rainbowOverlay = Math.max(0, this.rainbowOverlay - dt * 0.6)
     if (this.comboText && now > this.comboTextUntil) this.comboText = null
     if (this.levelUpText && now > this.levelUpTextUntil) this.levelUpText = null
 
@@ -442,6 +448,7 @@ export class Game {
 
     // spawn
     this.spawnTimer -= dt * 1000
+    const spawnInterval = this.state.isFuryMode ? lv.spawnIntervalMs / CONFIG.furyMode.spawnMultiplier : lv.spawnIntervalMs
     if (this.spawnTimer <= 0) {
       for (let b = 0; b < lv.burstCount; b++) {
         const ev = makeSpawn(this.rng, CANVAS_SIZE, lv)
@@ -451,7 +458,7 @@ export class Game {
           rotation: 0, angularVel: (this.rng() - 0.5) * 6, sliced: false,
         })
       }
-      this.spawnTimer = lv.spawnIntervalMs
+      this.spawnTimer = spawnInterval
     }
 
     // integrate + cull misses
@@ -537,7 +544,7 @@ export class Game {
   }
 
   private onSlice(e: Entity, now: number): void {
-    this.state.sliceFruit(now)
+    this.state.sliceFruit(now, e.type)
     this.spawnHalves(e)
     this.spawnParticles(e.pos, fruitColor(e.type))
     this.audio.play('slice')
@@ -546,6 +553,36 @@ export class Game {
       this.comboTextUntil = now + 900
       this.flash = Math.min(1, this.flash + 0.5)
       this.audio.play('combo')
+    }
+    // Check perfect slice streak
+    if (this.state.perfectStreak >= CONFIG.furyMode.streakThreshold && !this.state.isFuryMode) {
+      this.state.activateFuryMode(now)
+      this.furyOverlay = 1
+      this.comboText = '🔥 FURY MODE! 2x Points!'
+      this.comboTextUntil = now + 1500
+      this.flash = Math.min(1, this.flash + 0.8)
+      this.audio.play('combo')
+    }
+    // Check rainbow combo
+    if (this.state.checkRainbowCombo(now)) {
+      this.rainbowOverlay = 1
+      this.comboText = '🌈 RAINBOW COMBO! +500!'
+      this.comboTextUntil = now + 1500
+      this.flash = Math.min(1, this.flash + 0.8)
+      this.audio.play('combo')
+      // Spawn rainbow particles
+      this.spawnRainbowExplosion()
+    }
+  }
+
+  private spawnRainbowExplosion(): void {
+    const rainbowColors = ['#ff0000', '#ff7700', '#ffff00', '#00ff00', '#0000ff', '#8b00ff']
+    for (const color of rainbowColors) {
+      this.spawnParticles(
+        { x: CANVAS_SIZE.width / 2, y: CANVAS_SIZE.height / 2 },
+        color,
+        15,
+      )
     }
   }
 
@@ -653,7 +690,7 @@ export class Game {
       level: this.state.level, levelName: lv.name,
       fruitsThisLevel: this.state.fruitsSlicedThisLevel, fruitsToAdvance: lv.fruitsToAdvance,
       comboCount: this.state.lastCombo, comboText: this.comboText, levelUpText: this.levelUpText,
-      shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, freezeOverlay: this.freezeOverlay, shrinkOverlay: this.shrinkOverlay, now,
+      shake: this.shake, flash: this.flash, slowMoOverlay: this.slowMoOverlay, freezeOverlay: this.freezeOverlay, shrinkOverlay: this.shrinkOverlay, furyOverlay: this.furyOverlay, rainbowOverlay: this.rainbowOverlay, now,
       mode: this.gameMode,
       timeAttackElapsedMs,
       timeAttackDurationMs: this.timeAttackDurationMs,

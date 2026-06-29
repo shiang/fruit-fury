@@ -22,6 +22,16 @@ export class GameState {
   public goldenMultiplier = 1
   public goldenHourUntil = 0
 
+  // Perfect slice streak state
+  public perfectStreak = 0
+  public perfectStreakUntil = 0
+  public isFuryMode = false
+  public furyModeUntil = 0
+
+  // Rainbow combo state
+  public rainbowTypesThisCombo = new Set<string>()
+  public rainbowComboUntil = 0
+
   get levelConfig() {
     return getLevelConfig(this.level)
   }
@@ -34,7 +44,7 @@ export class GameState {
   }
 
   /** Register a fruit slice at time t (ms). Handles combo accrual + scoring. */
-  sliceFruit(t: number): void {
+  sliceFruit(t: number, fruitType?: string): void {
     if (this.isOver) return
     if (t - this.comboLastT <= this.comboWindowMs) {
       this.comboCount += 1
@@ -44,10 +54,38 @@ export class GameState {
     this.comboLastT = t
     this.lastCombo = this.comboCount
 
+    // Perfect slice streak tracking
+    if (t - this.perfectStreakUntil <= CONFIG.furyMode.streakResetWindowMs) {
+      this.perfectStreak += 1
+    } else {
+      this.perfectStreak = 1
+    }
+    this.perfectStreakUntil = t
+
+    // Rainbow combo tracking
+    if (fruitType && t - this.rainbowComboUntil <= CONFIG.rainbowCombo.resetWindowMs) {
+      this.rainbowTypesThisCombo.add(fruitType)
+    } else if (fruitType) {
+      this.rainbowTypesThisCombo = new Set([fruitType])
+    }
+    this.rainbowComboUntil = t
+
     // Combo chain multiplier: each slice in a combo is worth comboCount x base points
     // Golden hour multiplier stacks on top (default 1, 3 during golden hour)
-    this.score += CONFIG.points.fruit * this.comboCount * this.goldenMultiplier
+    // Fury mode multiplier stacks on top of golden hour
+    let multiplier = this.goldenMultiplier
+    if (this.isFuryMode) {
+      multiplier *= CONFIG.furyMode.pointsMultiplier
+    }
+    this.score += CONFIG.points.fruit * this.comboCount * multiplier
     this.fruitsSlicedThisLevel += 1
+  }
+
+  /** Called when a fruit is missed — resets streak and rainbow combo. */
+  resetStreak(): void {
+    this.perfectStreak = 0
+    this.perfectStreakUntil = 0
+    this.rainbowTypesThisCombo.clear()
   }
 
   sliceBomb(): void {
@@ -58,6 +96,7 @@ export class GameState {
 
   missFruit(): void {
     if (this.isOver) return
+    this.resetStreak()
     if (this.mode === 'zen' || this.mode === 'time-attack') return // no-op in zen/time-attack
     this.loseLife()
   }
@@ -128,6 +167,41 @@ export class GameState {
       return false
     }
     return true
+  }
+
+  /** Returns true if fury mode is currently active. */
+  isFuryModeActive(now: number): boolean {
+    if (now >= this.furyModeUntil) {
+      this.isFuryMode = false
+      return false
+    }
+    return true
+  }
+
+  /** Activate fury mode for the configured duration. */
+  activateFuryMode(now: number): void {
+    this.isFuryMode = true
+    this.furyModeUntil = now + CONFIG.furyMode.durationMs
+  }
+
+  /** Returns true if rainbow combo bonus is currently active. */
+  isRainbowComboActive(now: number): boolean {
+    if (now >= this.rainbowComboUntil) {
+      this.rainbowTypesThisCombo.clear()
+      return false
+    }
+    return true
+  }
+
+  /** Check if rainbow combo threshold is met and activate bonus. Returns true if just triggered. */
+  checkRainbowCombo(now: number): boolean {
+    if (this.rainbowTypesThisCombo.size >= CONFIG.rainbowCombo.requiredTypes) {
+      this.rainbowComboUntil = now + CONFIG.rainbowCombo.durationMs
+      this.score += CONFIG.rainbowCombo.bonusPoints
+      this.rainbowTypesThisCombo.clear()
+      return true
+    }
+    return false
   }
 
   private loseLife(): void {

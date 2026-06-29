@@ -42,6 +42,8 @@ export interface RenderInput {
   slowMoOverlay: number
   freezeOverlay: number
   shrinkOverlay: number
+  furyOverlay: number
+  rainbowOverlay: number
   now: number
   mode: 'classic' | 'zen' | 'time-attack'
   timeAttackElapsedMs?: number
